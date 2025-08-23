@@ -9,6 +9,7 @@ type TaskService interface {
 
 type TaskQueries interface {
 	List() ([]*domain.Task, error)
+	Get(id int64) (*domain.Task, error)
 }
 
 type TaskCommands interface {

@@ -22,3 +22,7 @@ func (service *TaskService) Create(task *domain.Task) (int64, error) {
 func (service *TaskService) List() ([]*domain.Task, error) {
 
 }
+
+func (service *TaskService) Get(id int64) (*domain.Task, error) {
+
+}

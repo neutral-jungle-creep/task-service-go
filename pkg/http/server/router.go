@@ -1,39 +1,73 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"strings"
 )
 
+const paramsContextKey = "params"
+
 type Router struct {
-	routes map[string]map[string]http.HandlerFunc
+	routes map[string][]route
+}
+
+type route struct {
+	pattern string
+	handler http.HandlerFunc
 }
 
 func NewRouter() *Router {
 	return &Router{
-		routes: make(map[string]map[string]http.HandlerFunc),
+		routes: make(map[string][]route),
 	}
 }
 
-func (r *Router) Register(method, path string, handler http.HandlerFunc) {
+func (r *Router) Register(method, pattern string, handler http.HandlerFunc) {
 	method = strings.ToUpper(method)
 
-	if r.routes[path] == nil {
-		r.routes[path] = make(map[string]http.HandlerFunc)
+	if len(r.routes[method]) == 0 {
+		r.routes[method] = make([]route, 0)
 	}
-	r.routes[path][method] = handler
+	r.routes[method] = append(r.routes[method], route{pattern: pattern, handler: handler})
+}
+
+func matchPattern(pattern, path string) (bool, map[string]string) {
+	params := make(map[string]string)
+
+	if !strings.Contains(pattern, "{") && !strings.Contains(pattern, "}") && pattern == path {
+		return true, nil // это запрос post или get без параметров
+	}
+
+	patternParts := strings.Split(strings.Trim(pattern, "/"), "/")
+	pathParts := strings.Split(strings.Trim(path, "/"), "/")
+
+	if len(patternParts) != len(pathParts) {
+		return false, nil
+	}
+
+	for i := 0; i < len(patternParts); i++ {
+		if strings.HasPrefix(patternParts[i], "{") && strings.HasSuffix(patternParts[i], "}") {
+			key := strings.Trim(patternParts[i], "{}")
+			params[key] = pathParts[i]
+		}
+	}
+	return true, params
 }
 
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	path := req.URL.Path
 	method := req.Method
 
-	handlersByMethod, ok := r.routes[path]
+	routesForMethod, ok := r.routes[method]
 	if ok {
-		handler, ok := handlersByMethod[method]
-		if ok {
-			handler.ServeHTTP(w, req)
-			return
+		for _, ro := range routesForMethod {
+			matched, params := matchPattern(ro.pattern, path)
+			if matched {
+				addParamsToContext(req, params)
+				ro.handler(w, req)
+				return
+			}
 		}
 
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -41,4 +75,19 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNotFound)
+}
+
+func addParamsToContext(req *http.Request, params map[string]string) {
+	if len(params) == 0 {
+		return
+	}
+	ctx := context.WithValue(req.Context(), paramsContextKey, params)
+	req.WithContext(ctx)
+}
+
+func RequestParams(r *http.Request) map[string]string {
+	if params, ok := r.Context().Value(paramsContextKey).(map[string]string); ok {
+		return params
+	}
+	return nil
 }
