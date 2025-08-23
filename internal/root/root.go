@@ -15,6 +15,7 @@ type Root struct {
 	logger   *logging.Logger
 	services struct {
 		taskService ports.TaskService
+		taskCache   ports.TaskCache
 	}
 	repositories struct {
 		taskRepository ports.TaskRepository

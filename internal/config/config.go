@@ -16,10 +16,12 @@ const (
 )
 
 type Config struct {
-	ServiceName string           `json:"serviceName"`
-	ReleaseID   string           `json:"releaseId"`
-	LogLevel    string           `json:"logLevel"`
-	HTTPServer  HTTPServerConfig `json:"httpServer"`
+	ServiceName                string           `json:"serviceName"`
+	ReleaseID                  string           `json:"releaseId"`
+	LogLevel                   string           `json:"logLevel"`
+	HTTPServer                 HTTPServerConfig `json:"httpServer"`
+	MemoryCacheLimitMB         int              `json:"memoryCacheLimitMB"`
+	MemoryMonitorCacheInterval time.Duration    `json:"memoryMonitorCacheInterval"`
 }
 
 type HTTPServerConfig struct {
