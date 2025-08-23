@@ -6,20 +6,20 @@ import (
 )
 
 type Router struct {
-	routes map[string]map[string]http.Handler
+	routes map[string]map[string]http.HandlerFunc
 }
 
 func NewRouter() *Router {
 	return &Router{
-		routes: make(map[string]map[string]http.Handler),
+		routes: make(map[string]map[string]http.HandlerFunc),
 	}
 }
 
-func (r *Router) Register(method, path string, handler http.Handler) {
+func (r *Router) Register(method, path string, handler http.HandlerFunc) {
 	method = strings.ToUpper(method)
 
 	if r.routes[path] == nil {
-		r.routes[path] = make(map[string]http.Handler)
+		r.routes[path] = make(map[string]http.HandlerFunc)
 	}
 	r.routes[path][method] = handler
 }
