@@ -33,8 +33,8 @@ type HTTPServerConfig struct {
 func NewConfigFromEnv() (*Config, error) {
 	var configPath string
 
-	flag.StringVar(&configPath, "path", "config", "Path to config file")
-	flag.StringVar(&configPath, "p", "config", "Path to config file")
+	flag.StringVar(&configPath, "path", "config.json", "Path to config file")
+	flag.StringVar(&configPath, "p", "config.json", "Path to config file")
 	flag.Parse()
 
 	config := newDefaultConfig()

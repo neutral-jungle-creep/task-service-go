@@ -33,8 +33,6 @@ func (r *Router) Register(method, pattern string, handler http.HandlerFunc) {
 }
 
 func matchPattern(pattern, path string) (bool, map[string]string) {
-	params := make(map[string]string)
-
 	if !strings.Contains(pattern, "{") && !strings.Contains(pattern, "}") && pattern == path {
 		return true, nil // это запрос post или get без параметров
 	}
@@ -45,6 +43,8 @@ func matchPattern(pattern, path string) (bool, map[string]string) {
 	if len(patternParts) != len(pathParts) {
 		return false, nil
 	}
+
+	params := make(map[string]string)
 
 	for i := 0; i < len(patternParts); i++ {
 		if strings.HasPrefix(patternParts[i], "{") && strings.HasSuffix(patternParts[i], "}") {
@@ -64,7 +64,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		for _, ro := range routesForMethod {
 			matched, params := matchPattern(ro.pattern, path)
 			if matched {
-				addParamsToContext(req, params)
+				req = addParamsToContext(req, params)
 				ro.handler(w, req)
 				return
 			}
@@ -77,16 +77,17 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func addParamsToContext(req *http.Request, params map[string]string) {
+func addParamsToContext(req *http.Request, params map[string]string) *http.Request {
 	if len(params) == 0 {
-		return
+		return req
 	}
 	ctx := context.WithValue(req.Context(), paramsContextKey, params)
-	req.WithContext(ctx)
+	return req.WithContext(ctx)
 }
 
 func RequestParams(r *http.Request) map[string]string {
-	if params, ok := r.Context().Value(paramsContextKey).(map[string]string); ok {
+	params, ok := r.Context().Value(paramsContextKey).(map[string]string)
+	if ok {
 		return params
 	}
 	return nil
