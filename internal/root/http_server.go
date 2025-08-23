@@ -16,7 +16,7 @@ func (r *Root) initHttpServer() {
 	apiImplementation := server.NewApi(r.services.taskService)
 
 	s := http_server.NewServer(
-		handler.InitRoutes(),
+		apiImplementation.InitRoutes(defaultRouteGroup),
 		http_server.Port(r.config.HTTPServer.ListenPort),
 		http_server.IdleTimeout(r.config.HTTPServer.KeepAliveTime+r.config.HTTPServer.KeepAliveTimeout),
 		http_server.ReadHeaderTimeout(r.config.HTTPServer.ReadHeaderTimeout),
