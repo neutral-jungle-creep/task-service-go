@@ -117,3 +117,56 @@ func (l *Logger) Fatal(msg string, err error) {
 	}
 	l.core.Fatal(e, l.config.Fields)
 }
+
+func (l *Logger) Error(msg string, err error) {
+	if ok := l.checkLevel(ErrorLevel); !ok {
+		return
+	}
+
+	e := Entry{
+		Level:   ErrorLevel.String(),
+		Time:    time.Now(),
+		Message: fmt.Sprintf("%s: %s", msg, err.Error()),
+		Stack:   string(debug.Stack()),
+	}
+	l.core.Println(e, l.config.Fields)
+}
+
+func (l *Logger) Info(msg string) {
+	if ok := l.checkLevel(InfoLevel); !ok {
+		return
+	}
+
+	e := Entry{
+		Level:   InfoLevel.String(),
+		Time:    time.Now(),
+		Message: msg,
+	}
+	l.core.Println(e, l.config.Fields)
+}
+
+func (l *Logger) Warn(msg string) {
+	if ok := l.checkLevel(WarnLevel); !ok {
+		return
+	}
+
+	e := Entry{
+		Level:   WarnLevel.String(),
+		Time:    time.Now(),
+		Message: msg,
+	}
+	l.core.Println(e, l.config.Fields)
+}
+
+func (l *Logger) Debug(msg string) {
+	if ok := l.checkLevel(DebugLevel); !ok {
+		return
+	}
+
+	e := Entry{
+		Level:   DebugLevel.String(),
+		Time:    time.Now(),
+		Message: msg,
+	}
+	l.core.Println(e, l.config.Fields)
+}

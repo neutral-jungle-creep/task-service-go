@@ -1,7 +1,6 @@
 package root
 
 import (
-	"context"
 	"fmt"
 
 	"task-service/internal/server"
@@ -26,7 +25,7 @@ func (r *Root) initHttpServer() {
 	r.RegisterStopHandler(func() { _ = s.Shutdown(r.ctx) })
 
 	r.RegisterBackgroundJob(func() error {
-		r.logger.InfoWithCtx(r.ctx, fmt.Sprintf("starting HTTP server on addr %s", r.config.HTTPServer.ListenPort))
+		r.logger.Info(fmt.Sprintf("starting HTTP server on addr %s", r.config.HTTPServer.ListenPort))
 		return s.ListenAndServe()
 	})
 }
