@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"task-service/internal/server"
-	"task-service/pkg/http_server"
+	server2 "task-service/pkg/http/server"
 )
 
 const (
@@ -14,12 +14,12 @@ const (
 func (r *Root) initHttpServer() {
 	apiImplementation := server.NewApi(r.services.taskService)
 
-	s := http_server.NewServer(
+	s := server2.NewServer(
 		apiImplementation.InitRoutes(defaultRouteGroup),
-		http_server.Port(r.config.HTTPServer.ListenPort),
-		http_server.IdleTimeout(r.config.HTTPServer.KeepAliveTime+r.config.HTTPServer.KeepAliveTimeout),
-		http_server.ReadHeaderTimeout(r.config.HTTPServer.ReadHeaderTimeout),
-		http_server.ReadTimeout(r.config.HTTPServer.ReadTimeout),
+		server2.Port(r.config.HTTPServer.ListenPort),
+		server2.IdleTimeout(r.config.HTTPServer.KeepAliveTime+r.config.HTTPServer.KeepAliveTimeout),
+		server2.ReadHeaderTimeout(r.config.HTTPServer.ReadHeaderTimeout),
+		server2.ReadTimeout(r.config.HTTPServer.ReadTimeout),
 	)
 
 	r.RegisterStopHandler(func() { _ = s.Shutdown(r.ctx) })

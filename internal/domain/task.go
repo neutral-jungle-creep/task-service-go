@@ -11,6 +11,15 @@ type Task struct {
 	UpdatedAt *time.Time
 }
 
+func NewTask(name, body string) *Task {
+	return &Task{
+		Name:      name,
+		Body:      body,
+		Status:    TaskStatusNew,
+		CreatedAt: time.Now(),
+	}
+}
+
 type TaskStatus string
 
 func (s TaskStatus) String() string {
