@@ -13,6 +13,14 @@ const (
 	defaultAddr              = ":8008"
 )
 
+type Config struct {
+	ListenPort        string        `json:"apiListenPort"`
+	KeepAliveTime     time.Duration `json:"keepAliveTime"`
+	KeepAliveTimeout  time.Duration `json:"keepAliveTimeout"`
+	ReadHeaderTimeout time.Duration `json:"keepAliveReadHeaderTimeout"`
+	ReadTimeout       time.Duration `json:"readTimeout"`
+}
+
 func NewServer(handler http.Handler, opts ...Option) *http.Server {
 	s := &http.Server{
 		Addr:              defaultAddr,

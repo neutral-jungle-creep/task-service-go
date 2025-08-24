@@ -28,7 +28,7 @@ func (api *Api) ListTasks(w http.ResponseWriter, _ *http.Request) {
 
 	response := dto.ListTasksResponse{
 		Items: tasksFromDomain(tasks),
-		Total: int64(len(tasks)), //  когда появится пагинация, это значение будет браться из метода total репозитория
+		Total: uint64(len(tasks)), //  когда появится пагинация, это значение будет браться из метода total репозитория
 	}
 	protocol.SendSuccessResponse(w, http.StatusOK, response)
 }
@@ -41,7 +41,7 @@ func (api *Api) GetTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.ParseInt(idParam, 10, 64)
+	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
 		protocol.SendErrorResponse(w, http.StatusBadRequest, incorrectRequestBodyError, err)
 	}

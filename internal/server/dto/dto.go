@@ -4,11 +4,11 @@ import "time"
 
 type ListTasksResponse struct {
 	Items []*GetTaskResponse `json:"items"`
-	Total int64              `json:"total"`
+	Total uint64             `json:"total"`
 }
 
 type GetTaskResponse struct {
-	ID        int64      `json:"id"`
+	ID        uint64     `json:"id"`
 	Name      string     `json:"name"`
 	Body      string     `json:"body"`
 	Status    string     `json:"status"`
@@ -22,5 +22,5 @@ type CreateTaskRequest struct {
 }
 
 type CreateTaskResponse struct {
-	ID int64 `json:"id"`
+	ID uint64 `json:"id"`
 }

@@ -34,7 +34,10 @@ func New(ctx context.Context, config *config.Config, logger *logging.Logger) (*R
 	}
 
 	root.initRepositories()
-	root.initServices()
+	err := root.initServices()
+	if err != nil {
+		return nil, err
+	}
 	root.initHttpServer()
 
 	return &root, nil

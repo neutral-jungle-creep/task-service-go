@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"task-service/internal/domain"
+	"task-service/internal/ports"
 )
 
 const (
@@ -22,7 +23,7 @@ type TaskCache struct {
 	firstKey              atomic.Uint64
 }
 
-func NewTaskCache(memoryLimitMB int, memoryMonitorInterval time.Duration) *TaskCache {
+func NewTaskCache(memoryLimitMB int, memoryMonitorInterval time.Duration, repository ports.TaskRepository) (*TaskCache, error) {
 	if memoryLimitMB <= 0 {
 		memoryLimitMB = defaultMemoryUsageMB
 	}
@@ -37,8 +38,32 @@ func NewTaskCache(memoryLimitMB int, memoryMonitorInterval time.Duration) *TaskC
 		memoryMonitorInterval: memoryMonitorInterval,
 	}
 
+	err := s.fill(repository)
+	if err != nil {
+		return nil, err
+	}
 	go s.memoryMonitor()
-	return s
+	return s, nil
+}
+
+func (t *TaskCache) fill(repository ports.TaskRepository) error {
+	tasks, err := repository.List(&ports.ListTasksFilter{ // получение данных с конца, чтобы добавить в кеш новейшие
+		Sort: ports.SortDesc,
+	})
+	if err != nil {
+		return err
+	}
+
+	var totalSize uint64
+	for _, task := range tasks {
+		totalSize += task.Size()
+		if totalSize >= uint64(float32(t.cleanupStartMB)*0.9) {
+			break
+		}
+		t.tasks.Store(task.ID, task)
+		t.firstKey.Store(task.ID)
+	}
+	return nil
 }
 
 func (t *TaskCache) memoryMonitor() {
@@ -49,7 +74,7 @@ func (t *TaskCache) memoryMonitor() {
 		var memStats runtime.MemStats
 		runtime.ReadMemStats(&memStats)
 
-		if memStats.Alloc > t.cleanupStartMB/1000 {
+		if memStats.Alloc > t.cleanupStartMB*1024*1024 {
 			t.cleanup()
 		}
 	}
@@ -60,7 +85,7 @@ func (t *TaskCache) cleanup() {
 	firstStoredKey := t.firstKey.Load()
 	var newFirstStoredKey uint64
 
-	for key := firstStoredKey; key < cleanupCount; key++ {
+	for key := firstStoredKey; key < cleanupCount; key++ { // эта реализация актуальна только для данных у которых id - автоинкремент
 		if _, ok := t.tasks.Load(key); ok {
 			t.tasks.Delete(key)
 			continue
@@ -80,7 +105,7 @@ func (t *TaskCache) Store(task *domain.Task) {
 	t.tasks.Store(task.ID, task)
 }
 
-func (t *TaskCache) List() []*domain.Task {
+func (t *TaskCache) List() ([]*domain.Task, uint64) {
 	tasks := make([]*domain.Task, 0, t.len.Load())
 
 	t.tasks.Range(func(key, value interface{}) bool {
@@ -90,10 +115,10 @@ func (t *TaskCache) List() []*domain.Task {
 		}
 		return true
 	})
-	return tasks
+	return tasks, t.firstKey.Load()
 }
 
-func (t *TaskCache) Get(id int64) (*domain.Task, bool) {
+func (t *TaskCache) Get(id uint64) (*domain.Task, bool) {
 	val, ok := t.tasks.Load(id)
 	if !ok {
 		return nil, false

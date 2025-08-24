@@ -4,15 +4,22 @@ import (
 	"task-service/internal/services"
 )
 
-func (r *Root) initServices() {
-	r.services.taskCache = services.NewTaskCache(
-		r.config.MemoryCacheLimitMB,
-		r.config.MemoryMonitorCacheInterval,
+func (r *Root) initServices() error {
+	var err error
+
+	r.services.taskCache, err = services.NewTaskCache(
+		r.config.Cache.MemoryCacheLimitMB,
+		r.config.Cache.MemoryMonitorCacheInterval,
+		r.repositories.taskRepository,
 	)
+	if err != nil {
+		return err
+	}
 
 	r.services.taskService = services.NewTaskService(
 		r.logger,
 		r.repositories.taskRepository,
 		r.services.taskCache,
 	)
+	return nil
 }

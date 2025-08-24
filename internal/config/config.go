@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"task-service/pkg/http/server"
 )
 
 const (
@@ -16,20 +17,16 @@ const (
 )
 
 type Config struct {
-	ServiceName                string           `json:"serviceName"`
-	ReleaseID                  string           `json:"releaseId"`
-	LogLevel                   string           `json:"logLevel"`
-	HTTPServer                 HTTPServerConfig `json:"httpServer"`
-	MemoryCacheLimitMB         int              `json:"memoryCacheLimitMB"`
-	MemoryMonitorCacheInterval time.Duration    `json:"memoryMonitorCacheInterval"`
+	ServiceName string        `json:"serviceName"`
+	ReleaseID   string        `json:"releaseId"`
+	LogLevel    string        `json:"logLevel"`
+	HTTPServer  server.Config `json:"httpServer"`
+	Cache       CacheConfig   `json:"cache"`
 }
 
-type HTTPServerConfig struct {
-	ListenPort        string        `json:"apiListenPort"`
-	KeepAliveTime     time.Duration `json:"keepAliveTime"`
-	KeepAliveTimeout  time.Duration `json:"keepAliveTimeout"`
-	ReadHeaderTimeout time.Duration `json:"keepAliveReadHeaderTimeout"`
-	ReadTimeout       time.Duration `json:"readTimeout"`
+type CacheConfig struct {
+	MemoryCacheLimitMB         int           `json:"memoryCacheLimitMB"`
+	MemoryMonitorCacheInterval time.Duration `json:"memoryMonitorCacheInterval"`
 }
 
 func NewConfigFromEnv() (*Config, error) {

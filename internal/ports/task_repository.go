@@ -3,7 +3,17 @@ package ports
 import "task-service/internal/domain"
 
 type TaskRepository interface {
-	Store(task *domain.Task) (int64, error)
-	List() ([]*domain.Task, error)
-	Get(id int64) (*domain.Task, error)
+	Store(task *domain.Task) (uint64, error)
+	List(filter *ListTasksFilter) ([]*domain.Task, error)
+	Get(id uint64) (*domain.Task, error)
+}
+
+const (
+	SortDesc = "desc"
+	SortAsc  = "asc"
+)
+
+type ListTasksFilter struct {
+	Sort string
+	ToId uint64
 }

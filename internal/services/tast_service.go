@@ -24,7 +24,7 @@ func NewTaskService(
 	}
 }
 
-func (s *TaskService) Create(task *domain.Task) (int64, error) {
+func (s *TaskService) Create(task *domain.Task) (uint64, error) {
 	id, err := s.repository.Store(task)
 	if err != nil {
 		return 0, err
@@ -37,16 +37,23 @@ func (s *TaskService) Create(task *domain.Task) (int64, error) {
 }
 
 func (s *TaskService) List() ([]*domain.Task, error) {
-	tasks := s.cache.List()
+	tasksFromCache, firstTaskKey := s.cache.List()
+	if firstTaskKey <= 1 {
+		return tasksFromCache, nil
+	}
 
-	tasks, err := s.repository.List() // todo тут надо добавить в метод лист репозитория параметры получения задач, которых уже нет в кеше
+	tasksFromDb, err := s.repository.List(&ports.ListTasksFilter{
+		ToId: firstTaskKey, // в репо будет запрос получения всех айдишек которые меньше firstTaskKey
+	})
 	if err != nil {
 		return nil, err
 	}
-	return tasks, nil
+
+	tasksFromDb = append(tasksFromDb, tasksFromCache...)
+	return tasksFromDb, nil
 }
 
-func (s *TaskService) Get(id int64) (*domain.Task, error) {
+func (s *TaskService) Get(id uint64) (*domain.Task, error) {
 	task, ok := s.cache.Get(id)
 	if ok {
 		return task, nil

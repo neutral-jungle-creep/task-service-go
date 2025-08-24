@@ -1,9 +1,12 @@
 package domain
 
-import "time"
+import (
+	"time"
+	"unsafe"
+)
 
 type Task struct {
-	ID        int64
+	ID        uint64
 	Name      string
 	Body      string
 	Status    TaskStatus
@@ -33,3 +36,16 @@ const (
 	TaskStatusComplete  TaskStatus = "COMPLETE"
 	TaskStatusCancel    TaskStatus = "CANCEL"
 )
+
+func (t *Task) Size() uint64 {
+	size := uintptr(0)
+
+	size += unsafe.Sizeof(t.ID)
+	size += unsafe.Sizeof(t.Name)
+	size += unsafe.Sizeof(t.Body)
+	size += unsafe.Sizeof(t.Status)
+	size += unsafe.Sizeof(t.CreatedAt)
+	size += unsafe.Sizeof(t.UpdatedAt)
+
+	return uint64(size)
+}
