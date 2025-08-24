@@ -9,6 +9,16 @@ import (
 	"time"
 )
 
+type Config struct {
+	LogLevel string `json:"logLevel"`
+	FileName string `json:"fileName"`
+}
+
+const (
+	defaultLogLevel    = "info"
+	defaultLogFileName = "logs.log"
+)
+
 type level uint8
 
 func (l level) String() string {
@@ -76,6 +86,10 @@ type Entry struct {
 }
 
 func NewLogger(logLevel, serviceName, releaseID string) (*Logger, error) {
+	if logLevel == "" {
+		logLevel = defaultLogLevel
+	}
+
 	parsedLogLevel, err := parseLogLevel(logLevel)
 	if err != nil {
 		return nil, err

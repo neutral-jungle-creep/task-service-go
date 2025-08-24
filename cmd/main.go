@@ -18,7 +18,7 @@ func main() {
 		panic(err)
 	}
 
-	logger, err := logging.NewLogger(cfg.LogLevel, cfg.ServiceName, cfg.ReleaseID)
+	logger, err := logging.NewLogger(cfg.Logger.LogLevel, cfg.ServiceName, cfg.ReleaseID)
 	if err != nil {
 		panic(err)
 	}

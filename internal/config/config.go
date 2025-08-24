@@ -10,18 +10,15 @@ import (
 
 	"github.com/pkg/errors"
 	"task-service/pkg/http/server"
-)
-
-const (
-	defaultLogLevel = "info"
+	"task-service/pkg/logging"
 )
 
 type Config struct {
-	ServiceName string        `json:"serviceName"`
-	ReleaseID   string        `json:"releaseId"`
-	LogLevel    string        `json:"logLevel"`
-	HTTPServer  server.Config `json:"httpServer"`
-	Cache       CacheConfig   `json:"cache"`
+	ServiceName string         `json:"serviceName"`
+	ReleaseID   string         `json:"releaseId"`
+	Logger      logging.Config `json:"logger"`
+	HTTPServer  server.Config  `json:"httpServer"`
+	Cache       CacheConfig    `json:"cache"`
 }
 
 type CacheConfig struct {
@@ -36,20 +33,14 @@ func NewConfigFromEnv() (*Config, error) {
 	flag.StringVar(&configPath, "p", "config.json", "Path to config file")
 	flag.Parse()
 
-	config := newDefaultConfig()
+	var config Config
 
-	err := processEnv(config, configPath)
+	err := processEnv(&config, configPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable process env")
 	}
 
-	return config, nil
-}
-
-func newDefaultConfig() *Config {
-	return &Config{
-		LogLevel: defaultLogLevel,
-	}
+	return &config, nil
 }
 
 func processEnv(config *Config, configPath string) error {
