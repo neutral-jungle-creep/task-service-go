@@ -16,26 +16,10 @@ func (r *Root) initServices() error {
 		return err
 	}
 
-	logChan := make(chan []byte)
-
 	r.services.taskService = services.NewTaskService(
 		r.logger,
 		r.repositories.taskRepository,
 		r.services.taskCache,
 	)
-
-	logsProcessor, err := services.NewLogProcessor(
-		r.ctx,
-		logChan,
-		r.config.Logger.FileName,
-		r.logger,
-	)
-
-	r.RegisterBackgroundJob(func() error {
-		return logsProcessor.Process()
-	})
-	r.RegisterStopHandler(func() {
-		logsProcessor.Stop()
-	})
 	return nil
 }

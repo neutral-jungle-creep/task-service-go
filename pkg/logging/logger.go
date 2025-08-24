@@ -14,10 +14,7 @@ type Config struct {
 	FileName string `json:"fileName"`
 }
 
-const (
-	defaultLogLevel    = "info"
-	defaultLogFileName = "logs.log"
-)
+const defaultLogLevel = "info"
 
 type level uint8
 
@@ -83,6 +80,26 @@ type Entry struct {
 	Time    time.Time
 	Message string
 	Stack   string
+	Fields  map[string]any
+}
+
+func (l *Logger) newEntry(lvl level, msg string) Entry {
+	return Entry{
+		Level:   lvl.String(),
+		Time:    time.Now(),
+		Message: msg,
+		Fields:  l.config.Fields,
+	}
+}
+
+func (l *Logger) newEntryWithError(lvl level, msg string, err error, stack []byte) Entry {
+	return Entry{
+		Level:   lvl.String(),
+		Time:    time.Now(),
+		Message: fmt.Sprintf("%s: %s", msg, err.Error()),
+		Stack:   string(stack),
+		Fields:  l.config.Fields,
+	}
 }
 
 func NewLogger(logLevel, serviceName, releaseID string) (*Logger, error) {
@@ -103,12 +120,12 @@ func NewLogger(logLevel, serviceName, releaseID string) (*Logger, error) {
 		},
 	}
 
-	logger := Logger{
+	logger := &Logger{
 		core:   log.New(os.Stderr, "", log.LstdFlags),
 		config: cfg,
 	}
 
-	return &logger, nil
+	return logger, nil
 }
 
 func (l *Logger) checkLevel(lvl level) bool {
@@ -122,14 +139,8 @@ func (l *Logger) Fatal(msg string, err error) {
 	if ok := l.checkLevel(FatalLevel); !ok {
 		return
 	}
-
-	e := Entry{
-		Level:   FatalLevel.String(),
-		Time:    time.Now(),
-		Message: fmt.Sprintf("%s: %s", msg, err.Error()),
-		Stack:   string(debug.Stack()),
-	}
-	l.core.Fatalf("%+v %v", e, l.config.Fields)
+	e := l.newEntryWithError(FatalLevel, msg, err, debug.Stack())
+	l.core.Fatalf("%+v", e)
 }
 
 func (l *Logger) Error(msg string, err error) {
@@ -137,13 +148,8 @@ func (l *Logger) Error(msg string, err error) {
 		return
 	}
 
-	e := Entry{
-		Level:   ErrorLevel.String(),
-		Time:    time.Now(),
-		Message: fmt.Sprintf("%s: %s", msg, err.Error()),
-		Stack:   string(debug.Stack()),
-	}
-	l.core.Printf("%+v %v", e, l.config.Fields)
+	e := l.newEntryWithError(ErrorLevel, msg, err, debug.Stack())
+	l.core.Printf("%+v", e)
 }
 
 func (l *Logger) Info(msg string) {
@@ -151,12 +157,8 @@ func (l *Logger) Info(msg string) {
 		return
 	}
 
-	e := Entry{
-		Level:   InfoLevel.String(),
-		Time:    time.Now(),
-		Message: msg,
-	}
-	l.core.Printf("%+v %v", e, l.config.Fields)
+	e := l.newEntry(InfoLevel, msg)
+	l.core.Printf("%+v", e)
 }
 
 func (l *Logger) Warn(msg string) {
@@ -164,12 +166,8 @@ func (l *Logger) Warn(msg string) {
 		return
 	}
 
-	e := Entry{
-		Level:   WarnLevel.String(),
-		Time:    time.Now(),
-		Message: msg,
-	}
-	l.core.Printf("%+v %v", e, l.config.Fields)
+	e := l.newEntry(WarnLevel, msg)
+	l.core.Printf("%+v", e)
 }
 
 func (l *Logger) Debug(msg string) {
@@ -177,10 +175,6 @@ func (l *Logger) Debug(msg string) {
 		return
 	}
 
-	e := Entry{
-		Level:   DebugLevel.String(),
-		Time:    time.Now(),
-		Message: msg,
-	}
-	l.core.Printf("%+v %v", e, l.config.Fields)
+	e := l.newEntry(DebugLevel, msg)
+	l.core.Printf("%+v", e)
 }

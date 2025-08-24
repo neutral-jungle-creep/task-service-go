@@ -12,7 +12,7 @@ import (
 type Root struct {
 	ctx      context.Context
 	config   *config.Config
-	logger   *logging.Logger
+	logger   *logging.AsyncLogger
 	services struct {
 		taskService ports.TaskService
 		taskCache   ports.TaskCache
@@ -29,14 +29,20 @@ func New(ctx context.Context, config *config.Config, logger *logging.Logger) (*R
 	root := Root{
 		ctx:    ctx,
 		config: config,
-		logger: logger,
 	}
 
-	root.initRepositories()
-	err := root.initServices()
+	err := root.initObservability(logger)
 	if err != nil {
 		return nil, err
 	}
+
+	root.initRepositories()
+
+	err = root.initServices()
+	if err != nil {
+		return nil, err
+	}
+
 	root.initHttpServer()
 
 	return &root, nil

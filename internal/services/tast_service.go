@@ -7,13 +7,13 @@ import (
 )
 
 type TaskService struct {
-	logger     *logging.Logger
+	logger     *logging.AsyncLogger
 	repository ports.TaskRepository
 	cache      ports.TaskCache
 }
 
 func NewTaskService(
-	logger *logging.Logger,
+	logger *logging.AsyncLogger,
 	repository ports.TaskRepository,
 	cache ports.TaskCache,
 ) *TaskService {
@@ -27,6 +27,7 @@ func NewTaskService(
 func (s *TaskService) Create(task *domain.Task) (uint64, error) {
 	id, err := s.repository.Store(task)
 	if err != nil {
+		s.logger.Error("failed to store task", err)
 		return 0, err
 	}
 

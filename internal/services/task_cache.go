@@ -37,6 +37,7 @@ func NewTaskCache(memoryLimitMB int, memoryMonitorInterval time.Duration, reposi
 		cleanupStartMB:        uint64(float32(memoryLimitMB) * 0.9), // когда заполнится 90% памяти, начнется чистка
 		memoryMonitorInterval: memoryMonitorInterval,
 	}
+	s.firstKey.Store(1)
 
 	err := s.fill(repository)
 	if err != nil {
