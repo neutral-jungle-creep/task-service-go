@@ -115,7 +115,7 @@ func (l *Logger) Fatal(msg string, err error) {
 		Message: fmt.Sprintf("%s: %s", msg, err.Error()),
 		Stack:   string(debug.Stack()),
 	}
-	l.core.Fatal(e, l.config.Fields)
+	l.core.Fatalf("%+v %v", e, l.config.Fields)
 }
 
 func (l *Logger) Error(msg string, err error) {
@@ -129,7 +129,7 @@ func (l *Logger) Error(msg string, err error) {
 		Message: fmt.Sprintf("%s: %s", msg, err.Error()),
 		Stack:   string(debug.Stack()),
 	}
-	l.core.Println(e, l.config.Fields)
+	l.core.Printf("%+v %v", e, l.config.Fields)
 }
 
 func (l *Logger) Info(msg string) {
@@ -142,7 +142,7 @@ func (l *Logger) Info(msg string) {
 		Time:    time.Now(),
 		Message: msg,
 	}
-	l.core.Println(e, l.config.Fields)
+	l.core.Printf("%+v %v", e, l.config.Fields)
 }
 
 func (l *Logger) Warn(msg string) {
@@ -155,7 +155,7 @@ func (l *Logger) Warn(msg string) {
 		Time:    time.Now(),
 		Message: msg,
 	}
-	l.core.Println(e, l.config.Fields)
+	l.core.Printf("%+v %v", e, l.config.Fields)
 }
 
 func (l *Logger) Debug(msg string) {
@@ -168,5 +168,5 @@ func (l *Logger) Debug(msg string) {
 		Time:    time.Now(),
 		Message: msg,
 	}
-	l.core.Println(e, l.config.Fields)
+	l.core.Printf("%+v %v", e, l.config.Fields)
 }

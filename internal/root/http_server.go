@@ -3,8 +3,8 @@ package root
 import (
 	"fmt"
 
-	"task-service/internal/server"
-	server2 "task-service/pkg/http/server"
+	api "task-service/internal/server"
+	server "task-service/pkg/http/server"
 )
 
 const (
@@ -12,14 +12,14 @@ const (
 )
 
 func (r *Root) initHttpServer() {
-	apiImplementation := server.NewApi(r.services.taskService)
+	apiImplementation := api.NewApi(r.services.taskService)
 
-	s := server2.NewServer(
+	s := server.NewServer(
 		apiImplementation.InitRoutes(defaultRouteGroup),
-		server2.Port(r.config.HTTPServer.ListenPort),
-		server2.IdleTimeout(r.config.HTTPServer.KeepAliveTime+r.config.HTTPServer.KeepAliveTimeout),
-		server2.ReadHeaderTimeout(r.config.HTTPServer.ReadHeaderTimeout),
-		server2.ReadTimeout(r.config.HTTPServer.ReadTimeout),
+		server.Port(r.config.HTTPServer.ListenPort),
+		server.IdleTimeout(r.config.HTTPServer.KeepAliveTime+r.config.HTTPServer.KeepAliveTimeout),
+		server.ReadHeaderTimeout(r.config.HTTPServer.ReadHeaderTimeout),
+		server.ReadTimeout(r.config.HTTPServer.ReadTimeout),
 	)
 
 	r.RegisterStopHandler(func() { _ = s.Shutdown(r.ctx) })

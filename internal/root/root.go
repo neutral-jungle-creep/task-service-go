@@ -21,7 +21,6 @@ type Root struct {
 		taskRepository ports.TaskRepository
 	}
 
-	startupTasks   []func() error
 	backgroundJobs []func() error
 	stopHandlers   []func()
 }
