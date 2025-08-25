@@ -11,7 +11,6 @@ import (
 
 type Config struct {
 	LogLevel string `json:"logLevel"`
-	FileName string `json:"fileName"`
 }
 
 const defaultLogLevel = "info"

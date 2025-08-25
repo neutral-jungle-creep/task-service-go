@@ -27,6 +27,7 @@ func (r *TaskRepository) Get(id uint64) (*domain.Task, error) {
 	return &domain.Task{}, nil
 }
 
+// это заглушка вместо автоинкремента базы данных чтобы при создании тасок генерировать новые id
 func (r *TaskRepository) autoIncrementID() uint64 {
 	return r.taskIdSequence.Add(1)
 }
