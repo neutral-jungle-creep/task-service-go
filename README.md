@@ -2,7 +2,7 @@
 
 ## Инструкция по запуску
 
-Для работы сервиса нужно создать конфиг-файл в формате json.
+Для работы сервиса нужно создать конфиг-файл в формате json. Все единицы измерения времени нужно вводить в секундах.
 Пример файла конфигурации:
 
 ```json
@@ -15,7 +15,9 @@
   "httpServer": {
     "apiListenPort": "8888",
     "keepAliveTime": 60,
-    "keepAliveTimeout": 10
+    "keepAliveTimeout": 10,
+    "keepAliveReadHeaderTimeout": 10,
+    "readTimeout": 10
   },
   "cache": {
     "memoryCacheLimitMB": 100,
