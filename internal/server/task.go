@@ -52,6 +52,14 @@ func (api *Api) GetTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// эту штуку вынесла из слоя сервиса потому что в другом месте программы может быть полезно
+	// чтобы сервис не генерировал ошибку когда ничего не найдено, не знаю насколько мои рассуждения правильны,
+	// но мне кажется так будет лучше
+	if task.ID == 0 {
+		protocol.SendErrorResponse(w, http.StatusNotFound, "", errors.New("task not found"))
+		return
+	}
+
 	response := taskFromDomain(task)
 	protocol.SendSuccessResponse(w, http.StatusOK, response)
 }

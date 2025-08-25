@@ -5,16 +5,16 @@ import (
 )
 
 func (r *Root) initObservability(logger *logging.Logger) error {
-	asyncLogger := logging.NewAsyncLogger(
+	r.logger = logging.NewAsyncLogger(
 		r.ctx,
 		logger,
 	)
 
 	r.RegisterBackgroundJob(func() error {
-		return asyncLogger.Process()
+		return r.logger.Process()
 	})
 	r.RegisterStopHandler(func() {
-		asyncLogger.Stop()
+		r.logger.Stop()
 	})
 	return nil
 }
