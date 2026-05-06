@@ -117,7 +117,7 @@ func (r *TaskRepository) List(filter *ports.ListTasksFilter) ([]*domain.Task, er
 	if err != nil {
 		return nil, fmt.Errorf("list tasks: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	tasks := make([]*domain.Task, 0)
 	for rows.Next() {
@@ -137,13 +137,13 @@ func (r *TaskRepository) List(filter *ports.ListTasksFilter) ([]*domain.Task, er
 
 func buildListQuery(filter *ports.ListTasksFilter) (string, []any) {
 	desc := filter != nil && filter.Sort == ports.SortDesc
-	hasToID := filter != nil && filter.ToId > 0
+	hasToID := filter != nil && filter.ToID > 0
 
 	switch {
 	case hasToID && desc:
-		return queryListTasksToIDDesc, []any{filter.ToId, defaultListLimit}
+		return queryListTasksToIDDesc, []any{filter.ToID, defaultListLimit}
 	case hasToID:
-		return queryListTasksToIDAsc, []any{filter.ToId, defaultListLimit}
+		return queryListTasksToIDAsc, []any{filter.ToID, defaultListLimit}
 	case desc:
 		return queryListTasksDesc, []any{defaultListLimit}
 	default:

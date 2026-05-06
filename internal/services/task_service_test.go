@@ -173,7 +173,7 @@ func TestTaskService_List_MergesRepoAndCache(t *testing.T) {
 	repo := &stubRepo{
 		listFunc: func(filter *ports.ListTasksFilter) ([]*domain.Task, error) {
 			require.NotNil(t, filter)
-			assert.Equal(t, uint64(5), filter.ToId)
+			assert.Equal(t, uint64(5), filter.ToID)
 			return []*domain.Task{{ID: 1}, {ID: 2}}, nil
 		},
 	}

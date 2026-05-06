@@ -15,5 +15,5 @@ const (
 
 type ListTasksFilter struct {
 	Sort string
-	ToId uint64
+	ToID uint64
 }

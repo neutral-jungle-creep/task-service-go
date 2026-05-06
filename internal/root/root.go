@@ -46,7 +46,7 @@ func New(ctx context.Context, config *config.Config, logger *logging.Logger) (*R
 		return nil, err
 	}
 
-	root.initHttpServer()
+	root.initHTTPServer()
 
 	return &root, nil
 }

@@ -1,14 +1,12 @@
 package root
 
 import (
-	"fmt"
-
 	api "task-service/internal/server"
 	server "task-service/pkg/http/server"
 )
 
-func (r *Root) initHttpServer() {
-	apiImplementation := api.NewApi(r.services.taskService)
+func (r *Root) initHTTPServer() {
+	apiImplementation := api.NewAPI(r.services.taskService)
 
 	s := server.NewServer(
 		apiImplementation.InitRoutes(r.config.RouteGroup),
@@ -21,7 +19,7 @@ func (r *Root) initHttpServer() {
 	r.RegisterStopHandler(func() { _ = s.Shutdown(r.ctx) })
 
 	r.RegisterBackgroundJob(func() error {
-		r.logger.Info(fmt.Sprintf("starting HTTP server on addr %s", r.config.HTTPServer.ListenPort))
+		r.logger.Info("starting HTTP server on addr " + r.config.HTTPServer.ListenPort)
 		return s.ListenAndServe()
 	})
 }
