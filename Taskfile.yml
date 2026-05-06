@@ -1,0 +1,189 @@
+version: '3'
+
+silent: true
+
+vars:
+  COMPOSE_PROJECT_NAME: task-service
+  TEST_COMPOSE_PROJECT_NAME: test-task-service
+
+  COVERAGE_DIR: .coverage
+  MIN_UNIT_COVERAGE:
+    sh: 'echo ${MIN_UNIT_COVERAGE:-50}'
+  MIN_INTEGRATION_COVERAGE:
+    sh: 'echo ${MIN_INTEGRATION_COVERAGE:-30}'
+  COVERAGE_EXCLUDE: '/docs/|main\.go|/dto/'
+
+  GOLANGCI_VERSION: v2.5.0
+  GOOSE_VERSION: v3.22.1
+  SWAG_VERSION: v1.16.4
+
+  GOOSE_MIGRATION_DIR: ./db/migrations
+  GOOSE_DRIVER: postgres
+  GOOSE_DBSTRING:
+    sh: '[ -f .env ] && grep -E "^GOOSE_DBSTRING=" .env | cut -d= -f2- | head -1 || echo ""'
+
+  TEST_DB_POSTGRES_DSN: 'host=127.0.0.1 port=5433 user=user password=user_password dbname=task-service-test sslmode=disable'
+
+tasks:
+  default:
+    cmds:
+      - task: info
+      - task: tidy
+      - task: fmt
+      - task: lint
+      - task: tests
+      - task: build
+
+  # ============================================================================
+  # INFORMATION
+  # ============================================================================
+  info:
+    cmds:
+      - echo "- Info"
+      - go version
+
+  # ============================================================================
+  # GO DEPENDENCIES
+  # ============================================================================
+  tidy:
+    cmds:
+      - echo "- Tidy"
+      - go mod tidy
+
+  vendor:
+    cmds:
+      - echo "- Vendor"
+      - go mod vendor
+
+  # ============================================================================
+  # FORMAT / LINT / SECURITY
+  # ============================================================================
+  fmt:
+    cmds:
+      - echo "- Fmt"
+      - gofmt -s -w .
+      - go run golang.org/x/tools/cmd/goimports@latest -w -local task-service .
+
+  lint:
+    cmds:
+      - echo "- Lint"
+      - go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_VERSION}} run ./...
+
+  lint:fix:
+    cmds:
+      - echo "- Lint fix"
+      - go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_VERSION}} run --fix ./...
+
+  security:
+    cmds:
+      - echo "- Security (govulncheck)"
+      - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  # ============================================================================
+  # TESTS (unit)
+  # ============================================================================
+  tests:
+    cmds:
+      - echo "- Unit tests"
+      - mkdir -p {{.COVERAGE_DIR}}
+      - go test -race -count=1 -coverprofile={{.COVERAGE_DIR}}/unit.out ./...
+
+  tests:coverage:
+    cmds:
+      - task: tests
+      - go tool cover -html={{.COVERAGE_DIR}}/unit.out -o {{.COVERAGE_DIR}}/unit.html
+      - bash scripts/check_coverage.sh {{.COVERAGE_DIR}}/unit.out {{.MIN_UNIT_COVERAGE}} '{{.COVERAGE_EXCLUDE}}'
+
+  # ============================================================================
+  # TESTS (integration) — requires running deployment/test stack
+  # ============================================================================
+  integration-tests:
+    cmds:
+      - echo "- Integration tests"
+      - task: deploy:test
+      - defer: { task: deploy:test:down }
+      - mkdir -p {{.COVERAGE_DIR}}
+      - TEST_DB_POSTGRES_DSN='{{.TEST_DB_POSTGRES_DSN}}' go test -tags=integration -race -count=1 -coverprofile={{.COVERAGE_DIR}}/integration.out ./tests/integration/...
+
+  integration-tests:coverage:
+    cmds:
+      - task: integration-tests
+      - go tool cover -html={{.COVERAGE_DIR}}/integration.out -o {{.COVERAGE_DIR}}/integration.html
+      - bash scripts/check_coverage.sh {{.COVERAGE_DIR}}/integration.out {{.MIN_INTEGRATION_COVERAGE}} '{{.COVERAGE_EXCLUDE}}'
+
+  # ============================================================================
+  # BUILD
+  # ============================================================================
+  build:
+    cmds:
+      - echo "- Build"
+      - mkdir -p bin
+      - CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o bin/server ./cmd
+
+  build:docker:
+    cmds:
+      - echo "- Build docker image"
+      - docker build -f build/server/Dockerfile --target app -t task-service:local .
+
+  # ============================================================================
+  # DEPLOY (local / test)
+  # ============================================================================
+  deploy:local:
+    cmds:
+      - echo "- Deploy local"
+      - docker compose -p {{.COMPOSE_PROJECT_NAME}} -f deployment/local/docker-compose.yml up -d --build
+
+  deploy:local:down:
+    cmds:
+      - echo "- Stop local"
+      - docker compose -p {{.COMPOSE_PROJECT_NAME}} -f deployment/local/docker-compose.yml down -v
+
+  deploy:local:logs:
+    cmds:
+      - docker compose -p {{.COMPOSE_PROJECT_NAME}} -f deployment/local/docker-compose.yml logs -f
+
+  deploy:test:
+    cmds:
+      - echo "- Deploy test"
+      - docker compose -p {{.TEST_COMPOSE_PROJECT_NAME}} -f deployment/test/docker-compose.yml up -d --build
+      - docker compose -p {{.TEST_COMPOSE_PROJECT_NAME}} -f deployment/test/docker-compose.yml run --rm task-service-migrate || true
+
+  deploy:test:down:
+    cmds:
+      - echo "- Stop test"
+      - docker compose -p {{.TEST_COMPOSE_PROJECT_NAME}} -f deployment/test/docker-compose.yml down -v
+
+  # ============================================================================
+  # DATABASE / MIGRATIONS (goose)
+  # ============================================================================
+  db:up:
+    cmds:
+      - go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} {{.GOOSE_DRIVER}} '{{.GOOSE_DBSTRING}}' up
+
+  db:down:
+    cmds:
+      - go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} {{.GOOSE_DRIVER}} '{{.GOOSE_DBSTRING}}' down
+
+  db:status:
+    cmds:
+      - go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} {{.GOOSE_DRIVER}} '{{.GOOSE_DBSTRING}}' status
+
+  db:create:
+    cmds:
+      - 'go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} create {{.CLI_ARGS}} sql'
+
+  # ============================================================================
+  # SWAGGER (placeholder for future swag-based docs)
+  # ============================================================================
+  swag:gen:
+    cmds:
+      - echo "- Generate swagger docs"
+      - go run github.com/swaggo/swag/cmd/swag@{{.SWAG_VERSION}} init -g cmd/main.go -o docs --parseInternal --parseDependency
+
+  # ============================================================================
+  # CLEAN
+  # ============================================================================
+  clean:
+    cmds:
+      - echo "- Clean"
+      - rm -rf bin {{.COVERAGE_DIR}}
