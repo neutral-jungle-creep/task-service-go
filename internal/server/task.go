@@ -19,7 +19,7 @@ const (
 	internalServerError       = "internal server error"
 )
 
-func (api *Api) ListTasks(w http.ResponseWriter, _ *http.Request) {
+func (api *API) ListTasks(w http.ResponseWriter, _ *http.Request) {
 	tasks, err := api.taskService.List()
 	if err != nil {
 		protocol.SendErrorResponse(w, http.StatusInternalServerError, internalServerError, err)
@@ -33,7 +33,7 @@ func (api *Api) ListTasks(w http.ResponseWriter, _ *http.Request) {
 	protocol.SendSuccessResponse(w, http.StatusOK, response)
 }
 
-func (api *Api) GetTask(w http.ResponseWriter, r *http.Request) {
+func (api *API) GetTask(w http.ResponseWriter, r *http.Request) {
 	params := server.RequestParams(r)
 	idParam := params["id"]
 	if len(idParam) == 0 {
@@ -63,7 +63,7 @@ func (api *Api) GetTask(w http.ResponseWriter, r *http.Request) {
 	protocol.SendSuccessResponse(w, http.StatusOK, response)
 }
 
-func (api *Api) CreateTask(w http.ResponseWriter, r *http.Request) {
+func (api *API) CreateTask(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		protocol.SendErrorResponse(w, http.StatusBadRequest, readRequestBodyError, err)

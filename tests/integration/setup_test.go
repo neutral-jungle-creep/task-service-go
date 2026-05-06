@@ -70,7 +70,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 	require.NoError(t, err)
 
 	svc := services.NewTaskService(async, repo, cache)
-	api := server.NewApi(svc)
+	api := server.NewAPI(svc)
 
 	httpSrv := httptest.NewServer(api.InitRoutes("/api/v1/task-service"))
 

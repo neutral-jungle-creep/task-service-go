@@ -48,7 +48,7 @@ const routeGroup = "/api/v1/task-service"
 
 func newTestServer(t *testing.T, svc *stubService) http.Handler {
 	t.Helper()
-	api := server.NewApi(svc)
+	api := server.NewAPI(svc)
 	return api.InitRoutes(routeGroup)
 }
 
