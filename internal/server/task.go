@@ -19,6 +19,14 @@ const (
 	internalServerError       = "internal server error"
 )
 
+// ListTasks returns all tasks currently known to the service.
+//
+//	@Summary	List tasks
+//	@Tags		tasks
+//	@Produce	json
+//	@Success	200	{object}	dto.ListTasksResponse
+//	@Failure	500	{object}	protocol.ExceptionResponse
+//	@Router		/tasks [get]
 func (api *API) ListTasks(w http.ResponseWriter, _ *http.Request) {
 	tasks, err := api.taskService.List()
 	if err != nil {
@@ -33,6 +41,17 @@ func (api *API) ListTasks(w http.ResponseWriter, _ *http.Request) {
 	protocol.SendSuccessResponse(w, http.StatusOK, response)
 }
 
+// GetTask returns a single task by id.
+//
+//	@Summary	Get task by id
+//	@Tags		tasks
+//	@Produce	json
+//	@Param		id	path		uint64	true	"Task id"
+//	@Success	200	{object}	dto.GetTaskResponse
+//	@Failure	400	{object}	protocol.ExceptionResponse
+//	@Failure	404	{object}	protocol.ExceptionResponse
+//	@Failure	500	{object}	protocol.ExceptionResponse
+//	@Router		/tasks/{id} [get]
 func (api *API) GetTask(w http.ResponseWriter, r *http.Request) {
 	params := server.RequestParams(r)
 	idParam := params["id"]
@@ -63,6 +82,17 @@ func (api *API) GetTask(w http.ResponseWriter, r *http.Request) {
 	protocol.SendSuccessResponse(w, http.StatusOK, response)
 }
 
+// CreateTask creates a new task and returns its id.
+//
+//	@Summary	Create task
+//	@Tags		tasks
+//	@Accept		json
+//	@Produce	json
+//	@Param		payload	body		dto.CreateTaskRequest	true	"Task to create"
+//	@Success	200		{object}	dto.CreateTaskResponse
+//	@Failure	400		{object}	protocol.ExceptionResponse
+//	@Failure	500		{object}	protocol.ExceptionResponse
+//	@Router		/tasks [post]
 func (api *API) CreateTask(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
