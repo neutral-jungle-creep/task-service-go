@@ -12,7 +12,7 @@ import (
 
 const (
 	defaultMemoryUsageMB         = 1024
-	defaultMemoryMonitorInterval = 5
+	defaultMemoryMonitorInterval = 5 * time.Second
 )
 
 type TaskCache struct {
@@ -34,7 +34,7 @@ func NewTaskCache(memoryLimitMB int, memoryMonitorInterval time.Duration, reposi
 
 	s := &TaskCache{
 		tasks:                 sync.Map{},
-		cleanupStartMB:        uint64(float32(memoryLimitMB) * 0.9), // когда заполнится 90% памяти, начнется чистка
+		cleanupStartMB:        uint64(float32(memoryLimitMB) * 0.9), // start eviction when 90% of the memory limit is reached
 		memoryMonitorInterval: memoryMonitorInterval,
 	}
 	s.firstKey.Store(1)
@@ -48,7 +48,7 @@ func NewTaskCache(memoryLimitMB int, memoryMonitorInterval time.Duration, reposi
 }
 
 func (t *TaskCache) fill(repository ports.TaskRepository) error {
-	tasks, err := repository.List(&ports.ListTasksFilter{ // получение данных с конца, чтобы добавить в кеш новейшие
+	tasks, err := repository.List(&ports.ListTasksFilter{ // fetch from the newest end so the cache holds the most recent records
 		Sort: ports.SortDesc,
 	})
 	if err != nil {
@@ -68,7 +68,7 @@ func (t *TaskCache) fill(repository ports.TaskRepository) error {
 }
 
 func (t *TaskCache) memoryMonitor() {
-	ticker := time.NewTicker(t.memoryMonitorInterval * time.Second)
+	ticker := time.NewTicker(t.memoryMonitorInterval)
 	defer ticker.Stop()
 
 	for range ticker.C {
@@ -82,11 +82,11 @@ func (t *TaskCache) memoryMonitor() {
 }
 
 func (t *TaskCache) cleanup() {
-	cleanupCount := t.len.Load() / 5 // удалится 20% самых старых записей
+	cleanupCount := t.len.Load() / 5 // drop the oldest 20% of cached records
 	firstStoredKey := t.firstKey.Load()
 	var newFirstStoredKey uint64
 
-	for key := firstStoredKey; key < cleanupCount; key++ { // эта реализация актуальна только для данных у которых id - автоинкремент
+	for key := firstStoredKey; key < cleanupCount; key++ { // works only for auto-increment ids without gaps
 		if _, ok := t.tasks.Load(key); ok {
 			t.tasks.Delete(key)
 			continue

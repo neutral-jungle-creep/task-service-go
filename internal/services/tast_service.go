@@ -26,8 +26,7 @@ func NewTaskService(
 	}
 }
 
-// понятно, излишнее логирование затормаживает программу, для примера работоспособности кеша и асинхронного логирования
-// добавила много дебаг логов
+// verbose debug logging is intentional here to demonstrate the cache and the async logger in action.
 
 func (s *TaskService) Create(task *domain.Task) (uint64, error) {
 	id, err := s.repository.Store(task)
@@ -53,7 +52,7 @@ func (s *TaskService) List() ([]*domain.Task, error) {
 	s.logger.AsyncDebug(fmt.Sprintf("list %d tasks from cache", len(tasksFromCache)))
 
 	tasksFromDb, err := s.repository.List(&ports.ListTasksFilter{
-		ToId: firstTaskKey, // в репо будет запрос получения всех айдишек которые меньше firstTaskKey
+		ToId: firstTaskKey, // ask the repository for all ids less than firstTaskKey
 	})
 	if err != nil {
 		s.logger.AsyncError("failed to list tasks", err)

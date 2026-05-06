@@ -34,7 +34,7 @@ func (r *Router) Register(method, pattern string, handler http.HandlerFunc) {
 
 func matchPattern(pattern, path string) (bool, map[string]string) {
 	if !strings.Contains(pattern, "{") && !strings.Contains(pattern, "}") && pattern == path {
-		return true, nil // это запрос post или get без параметров
+		return true, nil // request without path parameters
 	}
 
 	patternParts := strings.Split(strings.Trim(pattern, "/"), "/")

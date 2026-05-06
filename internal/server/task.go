@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	readRequestBodyError      = "ошибка чтения тела запроса"
-	incorrectRequestBodyError = "некорректный формат запроса"
-	internalServerError       = "внутренняя ошибка сервера"
+	readRequestBodyError      = "failed to read request body"
+	incorrectRequestBodyError = "incorrect request body"
+	internalServerError       = "internal server error"
 )
 
 func (api *Api) ListTasks(w http.ResponseWriter, _ *http.Request) {
@@ -28,7 +28,7 @@ func (api *Api) ListTasks(w http.ResponseWriter, _ *http.Request) {
 
 	response := dto.ListTasksResponse{
 		Items: tasksFromDomain(tasks),
-		Total: uint64(len(tasks)), //  когда появится пагинация, это значение будет браться из метода total репозитория
+		Total: uint64(len(tasks)), // once pagination is added this value will come from a repository total method
 	}
 	protocol.SendSuccessResponse(w, http.StatusOK, response)
 }
@@ -52,9 +52,8 @@ func (api *Api) GetTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// эту штуку вынесла из слоя сервиса потому что в другом месте программы может быть полезно
-	// чтобы сервис не генерировал ошибку когда ничего не найдено, не знаю насколько мои рассуждения правильны,
-	// но мне кажется так будет лучше
+	// not-found is detected here (and not inside the service) so that the service can stay
+	// quiet about missing rows and other callers can decide on their own how to react
 	if task.ID == 0 {
 		protocol.SendErrorResponse(w, http.StatusNotFound, "", errors.New("task not found"))
 		return

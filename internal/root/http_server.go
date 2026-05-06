@@ -7,15 +7,11 @@ import (
 	server "task-service/pkg/http/server"
 )
 
-const (
-	defaultRouteGroup = "/api/v1/task-service"
-)
-
 func (r *Root) initHttpServer() {
 	apiImplementation := api.NewApi(r.services.taskService)
 
 	s := server.NewServer(
-		apiImplementation.InitRoutes(defaultRouteGroup),
+		apiImplementation.InitRoutes(r.config.RouteGroup),
 		server.Port(r.config.HTTPServer.ListenPort),
 		server.IdleTimeout(r.config.HTTPServer.KeepAliveTime+r.config.HTTPServer.KeepAliveTimeout),
 		server.ReadHeaderTimeout(r.config.HTTPServer.ReadHeaderTimeout),
