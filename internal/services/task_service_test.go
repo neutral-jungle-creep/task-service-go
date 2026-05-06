@@ -100,8 +100,7 @@ func TestTaskService_Create_RepoError(t *testing.T) {
 	)
 
 	id, err := svc.Create(domain.NewTask("n", "b"))
-	require.Error(t, err)
-	assert.ErrorIs(t, err, want)
+	require.ErrorIs(t, err, want)
 	assert.Zero(t, id)
 }
 

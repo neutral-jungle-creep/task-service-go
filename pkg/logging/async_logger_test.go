@@ -26,7 +26,7 @@ func TestAsyncLogger_StopUnblocksProcess(t *testing.T) {
 
 	select {
 	case err := <-done:
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	case <-time.After(2 * time.Second):
 		t.Fatal("Process did not exit after Stop")
 	}

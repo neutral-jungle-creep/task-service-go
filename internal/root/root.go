@@ -31,18 +31,13 @@ func New(ctx context.Context, config *config.Config, logger *logging.Logger) (*R
 		config: config,
 	}
 
-	err := root.initObservability(logger)
-	if err != nil {
+	root.initObservability(logger)
+
+	if err := root.initRepositories(); err != nil {
 		return nil, err
 	}
 
-	err = root.initRepositories()
-	if err != nil {
-		return nil, err
-	}
-
-	err = root.initServices()
-	if err != nil {
+	if err := root.initServices(); err != nil {
 		return nil, err
 	}
 
