@@ -52,7 +52,7 @@ func (s *TaskService) List() ([]*domain.Task, error) {
 	s.logger.AsyncDebug(fmt.Sprintf("list %d tasks from cache", len(tasksFromCache)))
 
 	tasksFromDb, err := s.repository.List(&ports.ListTasksFilter{
-		ToId: firstTaskKey, // ask the repository for all ids less than firstTaskKey
+		ToID: firstTaskKey, // ask the repository for all ids less than firstTaskKey
 	})
 	if err != nil {
 		s.logger.AsyncError("failed to list tasks", err)
