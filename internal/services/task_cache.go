@@ -109,7 +109,7 @@ func (t *TaskCache) Store(task *domain.Task) {
 func (t *TaskCache) List() ([]*domain.Task, uint64) {
 	tasks := make([]*domain.Task, 0, t.len.Load())
 
-	t.tasks.Range(func(key, value interface{}) bool {
+	t.tasks.Range(func(_, value interface{}) bool {
 		task, ok := value.(*domain.Task)
 		if ok {
 			tasks = append(tasks, task)

@@ -6,7 +6,9 @@ import (
 	"strings"
 )
 
-const paramsContextKey = "params"
+type contextKey string
+
+const paramsContextKey contextKey = "params"
 
 type Router struct {
 	routes map[string][]route
