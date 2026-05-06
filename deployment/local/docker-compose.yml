@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: task-service
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: user_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_local:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d task-service"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - local
+
+  task-service-migrate:
+    build:
+      context: ./../..
+      dockerfile: ./build/server/Dockerfile
+      target: migrate
+    environment:
+      GOOSE_DBSTRING: "host=postgres port=5432 user=user password=user_password dbname=task-service sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - local
+
+  task-service:
+    build:
+      context: ./../..
+      dockerfile: ./build/server/Dockerfile
+      target: app
+    environment:
+      SERVICE_NAME: "task-service-go"
+      RELEASE_ID: "local"
+      LOG_LEVEL: "debug"
+      HTTP_SERVER_PORT: "8888"
+      DB_POSTGRES_DSN: "host=postgres port=5432 user=user password=user_password dbname=task-service sslmode=disable"
+      DB_POSTGRES_MAX_OPEN_CONNS: "10"
+      DB_POSTGRES_MAX_IDLE_CONNS: "5"
+      DB_POSTGRES_CONN_MAX_LIFETIME: "30m"
+      CACHE_MEMORY_LIMIT_MB: "100"
+      CACHE_MEMORY_MONITOR_INTERVAL: "10s"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      task-service-migrate:
+        condition: service_completed_successfully
+    ports:
+      - "8888:8888"
+    networks:
+      - local
+
+volumes:
+  postgres_data_local:
+
+networks:
+  local:
+    driver: bridge
