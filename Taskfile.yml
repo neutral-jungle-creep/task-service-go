@@ -64,6 +64,24 @@ tasks:
       - gofmt -s -w .
       - go run golang.org/x/tools/cmd/goimports@latest -w -local task-service .
 
+  fmt:check:
+    cmds:
+      - echo "- Fmt check"
+      - |
+        OUT=$(gofmt -l . | grep -v '^vendor/' || true)
+        if [ -n "$OUT" ]; then
+          echo "Files not gofmt-ed:"
+          echo "$OUT"
+          exit 1
+        fi
+      - |
+        OUT=$(go run golang.org/x/tools/cmd/goimports@latest -l -local task-service . | grep -v '^vendor/' || true)
+        if [ -n "$OUT" ]; then
+          echo "Files with bad imports:"
+          echo "$OUT"
+          exit 1
+        fi
+
   lint:
     cmds:
       - echo "- Lint"

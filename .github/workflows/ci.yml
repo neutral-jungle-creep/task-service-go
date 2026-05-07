@@ -12,6 +12,25 @@ env:
   GO_VERSION: "1.26.2"
 
 jobs:
+  fmt:
+    name: Fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run fmt check
+        run: task fmt:check
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -23,10 +42,13 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - uses: golangci/golangci-lint-action@v8
+      - uses: arduino/setup-task@v2
         with:
-          version: v2.5.0
-          args: --timeout=5m
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run lint
+        run: task lint
 
   unit-tests:
     name: Unit tests
@@ -39,10 +61,13 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
+      - uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run unit tests
-        run: |
-          mkdir -p .coverage
-          go test -race -count=1 -coverprofile=.coverage/unit.out ./...
+        run: task tests
 
       - name: Check coverage threshold
         run: bash scripts/check_coverage.sh .coverage/unit.out 50 '/docs/|main\.go|/dto/'
