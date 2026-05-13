@@ -20,27 +20,29 @@ func SendErrorResponse(w http.ResponseWriter, status int, message string, err er
 		Timestamp:    time.Now().Truncate(time.Second),
 	}
 
-	bytes, err := json.Marshal(errDTO)
+	body, err := json.Marshal(errDTO)
 	if err != nil {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = w.Write([]byte(err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(err.Error()))
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(bytes)
 	w.WriteHeader(status)
+	_, _ = w.Write(body)
 }
 
 func SendSuccessResponse(w http.ResponseWriter, status int, body any) {
-	bytes, err := json.Marshal(body)
+	payload, err := json.Marshal(body)
 	if err != nil {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = w.Write([]byte(err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(err.Error()))
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(bytes)
 	w.WriteHeader(status)
+	_, _ = w.Write(payload)
 }

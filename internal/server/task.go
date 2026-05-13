@@ -63,6 +63,7 @@ func (api *API) GetTask(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
 		protocol.SendErrorResponse(w, http.StatusBadRequest, incorrectRequestBodyError, err)
+		return
 	}
 
 	task, err := api.taskService.Get(id)

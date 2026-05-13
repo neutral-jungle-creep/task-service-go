@@ -2,67 +2,7 @@
 
 Список проблем, выявленных при ревью текущего состояния `task-service-go`. Каждый пункт содержит локацию, описание, последствия и предлагаемый фикс. Severity: **High** — ломает функциональность; **Medium** — корректное поведение в нормальных случаях, но рушится при нагрузке/edge-кейсах; **Low** — стиль/устойчивость.
 
----
-
-## 1. `protocol.go` — `WriteHeader` вызывается ПОСЛЕ `Write`
-
-**Severity:** High
-**Файл:** [pkg/http/protocol/protocol.go](pkg/http/protocol/protocol.go) — функции `SendErrorResponse` и `SendSuccessResponse`.
-
-**Проблема.** В обеих функциях порядок вызовов:
-
-```go
-w.Header().Set("Content-Type", "application/json")
-_, _ = w.Write(bytes)        // Write неявно вызывает WriteHeader(http.StatusOK)
-w.WriteHeader(status)        // late WriteHeader — игнорируется, выводит warning "superfluous response.WriteHeader"
-```
-
-Спецификация `net/http`: первый вызов `Write` без предшествующего `WriteHeader` неявно отдаёт `200 OK`. Все последующие `WriteHeader` уже не работают.
-
-**Последствия.**
-- Все ошибки клиенту приходят как `200 OK` с JSON-телом, в котором лежит `"status": 4xx`. То есть код состояния всегда некорректен.
-- В логах сервера — постоянные предупреждения `http: superfluous response.WriteHeader call`.
-- Невозможно нормально мониторить ошибки по HTTP-коду (4xx/5xx алерты не сработают).
-
-**Фикс.** Поменять порядок: сначала `Header().Set`, затем `WriteHeader(status)`, затем `Write(body)`. Также в ветке ошибки маршалинга добавить `return` — сейчас функция всё равно идёт дальше и пишет JSON-ответ поверх.
-
-```go
-w.Header().Set("Content-Type", "application/json")
-w.WriteHeader(status)
-_, _ = w.Write(body)
-```
-
-**Тесты.** В [pkg/http/protocol/protocol_test.go](pkg/http/protocol/protocol_test.go) уже есть `TestSendErrorResponse_StatusAndBody` и `TestSendSuccessResponse_StatusAndBody`, которые ожидают корректный код — после фикса они должны зеленеть. Сейчас они падают.
-
----
-
-## 2. `task.go` — отсутствует `return` после ошибки `ParseUint` в `GetTask`
-
-**Severity:** High
-**Файл:** [internal/server/task.go](internal/server/task.go), функция `GetTask`, строки `id, err := strconv.ParseUint(...)`.
-
-**Проблема.**
-
-```go
-id, err := strconv.ParseUint(idParam, 10, 64)
-if err != nil {
-    protocol.SendErrorResponse(w, http.StatusBadRequest, incorrectRequestBodyError, err)
-    // отсутствует return!
-}
-
-task, err := api.taskService.Get(id)
-```
-
-После отправки 400-ответа выполнение продолжается, и в сервис отправляется `id == 0` (zero value после неудачного `ParseUint`). После этого пишется ещё один HTTP-ответ — это double-write, статус 200 пишется поверх 400, плюс впустую тратится поход в БД.
-
-**Последствия.**
-- Клиент получает противоречивый ответ (часть сообщения о 400, потом 200).
-- Лишний запрос в БД на каждый невалидный id.
-- `superfluous WriteHeader` в логах.
-
-**Фикс.** Добавить `return` сразу после `SendErrorResponse`.
-
-**Тесты.** В [internal/server/task_test.go](internal/server/task_test.go) тест `TestApi_GetTask_BadID` проверяет что `taskService.Get` НЕ вызывается при некорректном id — он сейчас падает.
+> **Закрыто:** пункты #1 (`protocol.go` — порядок WriteHeader/Write) и #2 (`task.go` — отсутствующий `return` в `GetTask`) — исправлено.
 
 ---
 
@@ -297,11 +237,11 @@ if params.Name == "" || params.Body == "" {
 
 ## Сводная таблица
 
-| № | Файл | Severity | Что сломано | Кратко исправление |
-|---|---|---|---|---|
-| 1 | pkg/http/protocol/protocol.go | High | WriteHeader после Write | поменять порядок |
-| 2 | internal/server/task.go | High | нет return после 400 | добавить `return` |
-| 3 | internal/services/task_cache.go (старое) | Medium | cleanup ломается на разрывах | sort + drop oldest N (уже в pkg/cache) |
+| № | Файл | Severity | Что сломано | Кратко исправление | Статус |
+|---|---|---|---|---|---|
+| 1 | pkg/http/protocol/protocol.go | High | WriteHeader после Write | поменять порядок | ✅ исправлено |
+| 2 | internal/server/task.go | High | нет return после 400 | добавить `return` | ✅ исправлено |
+| 3 | internal/services/task_cache.go (старое) | Medium | cleanup ломается на разрывах | sort + drop oldest N (уже в pkg/cache) | |
 | 4 | internal/services/tast_service.go | Low | опечатка имени файла | переименовать |
 | 5 | internal/domain/task.go | Medium | Size без длины строк | `len(Name)+len(Body)+...` |
 | 6 | cmd/main.go | Medium | panic на init | `log.Fatalf` |
