@@ -8,7 +8,6 @@ REST-сервис для управления задачами (CRUD): созд�
 
 - [Технологический стек](#технологический-стек)
 - [Архитектура](#архитектура)
-- [Структура директорий](#структура-директорий)
 - [Конфигурация](#конфигурация)
 - [API](#api)
 - [Локальный запуск](#локальный-запуск)
@@ -78,47 +77,6 @@ REST-сервис для управления задачами (CRUD): созд�
 - **Ports & Adapters** — внешние зависимости (БД, кеш, HTTP) скрываются за интерфейсами в `internal/ports`.
 - **Однонаправленные импорты** — `domain` ← `ports` ← `services` ← `adapters`/`server` ← `root` ← `cmd`.
 - **Background jobs + stop handlers** — каждое долгоживущее сервисное соединение (HTTP-сервер, асинхронный логгер, кеш-monitor, БД-пул) регистрируется в DI-контейнере, который параллельно поднимает их в `Run` и останавливает в `stop`.
-
-## Структура директорий
-
-```
-task-service-go/
-├── .github/workflows/ci.yml      # CI: lint, unit, integration, build, security
-├── .golangci.yml                 # конфиг линтера v2
-├── .env.example                  # шаблон переменных окружения
-├── Taskfile.yml                  # оркестратор задач (go-task)
-├── BUGS.md                       # известные баги (для сервисной/ревью-доки)
-├── README.md
-├── go.mod / go.sum
-├── build/
-│   └── server/
-│       └── Dockerfile            # multi-stage: builder, app, migrate
-├── deployment/
-│   ├── local/docker-compose.yml  # postgres + migrate + app
-│   └── test/docker-compose.yml   # postgres + migrate (для integration-тестов)
-├── db/
-│   └── migrations/               # SQL-миграции goose
-├── docs/                         # swagger (генерируется `task swag:gen`)
-├── scripts/
-│   └── check_coverage.sh         # порог покрытия для CI
-├── cmd/main.go                   # точка входа
-├── internal/
-│   ├── adapters/repositories/    # Postgres-реализация TaskRepository
-│   ├── config/                   # envconfig-конфиг + .env поддержка
-│   ├── domain/                   # Task, TaskStatus
-│   ├── ports/                    # интерфейсы между слоями
-│   ├── root/                     # DI: orchestration сервисов и фоновых задач
-│   └── server/                   # HTTP API + DTO + конвертеры
-├── pkg/                          # переиспользуемые модули
-│   ├── cache/                    # generic in-memory cache
-│   ├── http/
-│   │   ├── protocol/             # JSON success/error responses
-│   │   └── server/               # роутер + http.Server factory
-│   ├── logging/                  # sync + async логгеры
-│   └── postgres/                 # фабрика *sql.DB поверх pgx/v5/stdlib
-└── tests/
-    └── integration/              # HTTP-тесты вокруг реального Postgres
-```
 
 ## Конфигурация
 
