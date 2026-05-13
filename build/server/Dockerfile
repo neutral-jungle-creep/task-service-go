@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # -------- common build --------
-FROM golang:1.26.2-alpine AS builder
+FROM golang:1.26.3-alpine AS builder
 
 ENV BIN_FILE=/opt/app/bin/server
 ENV CODE_DIR=/build
@@ -18,7 +18,7 @@ COPY . ${CODE_DIR}
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o ${BIN_FILE} ./cmd
 
 # -------- builder for goose --------
-FROM golang:1.26.2-alpine AS goose-builder
+FROM golang:1.26.3-alpine AS goose-builder
 RUN apk add --no-cache git
 RUN go install github.com/pressly/goose/v3/cmd/goose@v3.22.1
 
