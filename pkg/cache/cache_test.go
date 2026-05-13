@@ -89,14 +89,14 @@ func TestCache_ConcurrentStore(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(writers)
-	for w := 0; w < writers; w++ {
+	for w := uint64(0); w < writers; w++ {
 		go func(base uint64) {
 			defer wg.Done()
 			for i := uint64(0); i < perWriter; i++ {
 				id := base*1000 + i
 				c.Store(id, &item{id: id, size: 1})
 			}
-		}(uint64(w))
+		}(w)
 	}
 	wg.Wait()
 
