@@ -1,50 +1,50 @@
 # Task service
 
-REST-сервис для управления задачами (CRUD): создание, получение по id, список. Поверх PostgreSQL стоит in-memory кеш с эвикцией по памяти, чтобы свежие задачи отдавались без похода в БД.
+REST service for task management (CRUD): create, get by id, list. PostgreSQL is the system of record; an in-memory cache with memory-based eviction sits in front of it so that recent tasks are served without hitting the database.
 
 ---
 
-## Содержание
+## Table of contents
 
-- [Технологический стек](#технологический-стек)
-- [Архитектура](#архитектура)
-- [Конфигурация](#конфигурация)
+- [Tech stack](#tech-stack)
+- [Architecture](#architecture)
+- [Configuration](#configuration)
 - [API](#api)
-- [Локальный запуск](#локальный-запуск)
-- [Тесты](#тесты)
-- [Линтер](#линтер)
-- [Сборка](#сборка)
-- [Деплой](#деплой)
+- [Local run](#local-run)
+- [Tests](#tests)
+- [Linter](#linter)
+- [Build](#build)
+- [Deploy](#deploy)
 - [Swagger](#swagger)
-- [Миграции БД](#миграции-бд)
+- [Database migrations](#database-migrations)
 - [CI/CD](#cicd)
-- [Соглашения и ограничения](#соглашения-и-ограничения)
+- [Conventions and limitations](#conventions-and-limitations)
 - [Roadmap](#roadmap)
 
 ---
 
-## Технологический стек
+## Tech stack
 
-| Слой | Технология |
+| Layer | Technology |
 |---|---|
-| Язык | Go 1.26.3 |
-| HTTP | stdlib `net/http` + собственный роутер [pkg/http/server](pkg/http/server) с поддержкой `{param}` |
-| Логи | собственный синхронный + асинхронный логгер [pkg/logging](pkg/logging) |
-| Кеш | generic in-memory cache [pkg/cache](pkg/cache) с эвикцией по памяти |
-| БД | PostgreSQL 17 + драйвер [`jackc/pgx/v5/stdlib`](https://github.com/jackc/pgx) |
-| Миграции | [`pressly/goose/v3`](https://github.com/pressly/goose) |
-| Конфигурация | [`kelseyhightower/envconfig`](https://github.com/kelseyhightower/envconfig) + [`joho/godotenv`](https://github.com/joho/godotenv) (.env для локалки) |
-| Документация API | [`swaggo/swag`](https://github.com/swaggo/swag) + [`swaggo/http-swagger/v2`](https://github.com/swaggo/http-swagger) |
-| Тесты | стандартный `testing` + [`stretchr/testify`](https://github.com/stretchr/testify) |
-| Контейнеризация | Docker (multi-stage) + docker-compose |
-| Оркестратор задач | [Task](https://taskfile.dev) (`Taskfile.yml`) |
-| Линтер | [`golangci-lint` v2](https://golangci-lint.run) (.golangci.yml) |
-| Уязвимости | `govulncheck` |
+| Language | Go 1.26.3 |
+| HTTP | stdlib `net/http` + custom router [pkg/http/server](pkg/http/server) with `{param}` support |
+| Logging | custom sync + async logger [pkg/logging](pkg/logging) |
+| Cache | generic in-memory cache [pkg/cache](pkg/cache) with memory-based eviction |
+| DB | PostgreSQL 17 + driver [`jackc/pgx/v5/stdlib`](https://github.com/jackc/pgx) |
+| Migrations | [`pressly/goose/v3`](https://github.com/pressly/goose) |
+| Configuration | [`kelseyhightower/envconfig`](https://github.com/kelseyhightower/envconfig) + [`joho/godotenv`](https://github.com/joho/godotenv) (.env for local) |
+| API docs | [`swaggo/swag`](https://github.com/swaggo/swag) + [`swaggo/http-swagger/v2`](https://github.com/swaggo/http-swagger) |
+| Tests | stdlib `testing` + [`stretchr/testify`](https://github.com/stretchr/testify) |
+| Containers | Docker (multi-stage) + docker-compose |
+| Task runner | [Task](https://taskfile.dev) (`Taskfile.yml`) |
+| Linter | [`golangci-lint` v2](https://golangci-lint.run) (.golangci.yml) |
+| Vulnerabilities | `govulncheck` |
 | CI | GitHub Actions |
 
-## Архитектура
+## Architecture
 
-Чистая слоистая архитектура с DI-контейнером (`internal/root`):
+Layered architecture with a DI container (`internal/root`):
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -73,40 +73,41 @@ REST-сервис для управления задачами (CRUD): созд�
                   └────────────────────────┘
 ```
 
-Принципы:
-- **Ports & Adapters** — внешние зависимости (БД, кеш, HTTP) скрываются за интерфейсами в `internal/ports`.
-- **Однонаправленные импорты** — `domain` ← `ports` ← `services` ← `adapters`/`server` ← `root` ← `cmd`.
-- **Background jobs + stop handlers** — каждое долгоживущее сервисное соединение (HTTP-сервер, асинхронный логгер, кеш-monitor, БД-пул) регистрируется в DI-контейнере, который параллельно поднимает их в `Run` и останавливает в `stop`.
+Principles:
 
-## Конфигурация
+- **Ports & Adapters** — external dependencies (DB, cache, HTTP) sit behind interfaces in `internal/ports`.
+- **One-way imports** — `domain` ← `ports` ← `services` ← `adapters`/`server` ← `root` ← `cmd`.
+- **Background jobs + stop handlers** — every long-lived component (HTTP server, async logger, cache memory monitor, DB pool) is registered in the DI container, started in parallel in `Run`, and stopped in `stop`.
 
-Конфигурация читается через `kelseyhightower/envconfig`. Локально удобно держать значения в `.env` (он автоматически подхватывается); в контейнерах — через `environment:` в compose-файлах. Шаблон значений: [.env.example](.env.example).
+## Configuration
 
-| ENV | Default | Описание |
+Configuration is read via `kelseyhightower/envconfig`. Locally a `.env` file is convenient (it is auto-loaded); in containers values come from `environment:` in the compose files. Template: [.env.example](.env.example).
+
+| ENV | Default | Description |
 |---|---|---|
-| `SERVICE_NAME` | `task-service-go` | Имя сервиса в логах |
-| `RELEASE_ID` | — | Идентификатор сборки в логах |
+| `SERVICE_NAME` | `task-service-go` | Service name in log fields |
+| `RELEASE_ID` | — | Build identifier in log fields |
 | `LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error` / `fatal` |
-| `ROUTE_GROUP` | `/api/v1/task-service` | Префикс HTTP-роутов |
-| `HTTP_SERVER_LISTEN_PORT` | `8888` | Порт прослушивания |
+| `ROUTE_GROUP` | `/api/v1/task-service` | HTTP route prefix |
+| `HTTP_SERVER_LISTEN_PORT` | `8888` | Listening port |
 | `HTTP_SERVER_KEEP_ALIVE_TIME` | `60s` | |
 | `HTTP_SERVER_KEEP_ALIVE_TIMEOUT` | `10s` | |
 | `HTTP_SERVER_READ_HEADER_TIMEOUT` | `10s` | |
 | `HTTP_SERVER_READ_TIMEOUT` | `10s` | |
 | `HTTP_SERVER_WRITE_TIMEOUT` | `10s` | |
-| `DB_POSTGRES_DSN` | **required** | Строка подключения к Postgres (формат `host=… port=… user=… password=… dbname=… sslmode=…`) |
+| `DB_POSTGRES_DSN` | **required** | Postgres connection string (`host=… port=… user=… password=… dbname=… sslmode=…`) |
 | `DB_POSTGRES_MAX_OPEN_CONNS` | `10` | |
 | `DB_POSTGRES_MAX_IDLE_CONNS` | `5` | |
 | `DB_POSTGRES_MAX_LIFETIME` | `30m` | |
 | `DB_POSTGRES_QUERY_TIMEOUT` | `5s` | |
-| `CACHE_MEMORY_LIMIT_MB` | `1024` | Лимит по памяти; cleanup стартует на 90% |
-| `CACHE_MEMORY_MONITOR_INTERVAL` | `5s` | Период проверки памяти |
+| `CACHE_MEMORY_LIMIT_MB` | `1024` | Memory budget; cleanup starts at 90% |
+| `CACHE_MEMORY_MONITOR_INTERVAL` | `5s` | How often the monitor checks memory pressure |
 
 ## API
 
-Все ручки доступны под префиксом из `ROUTE_GROUP` (по умолчанию `/api/v1/task-service`).
+All endpoints live under the `ROUTE_GROUP` prefix (default `/api/v1/task-service`).
 
-### `POST /tasks` — создать задачу
+### `POST /tasks` — create a task
 
 ```bash
 curl -s -X POST localhost:8888/api/v1/task-service/tasks \
@@ -118,7 +119,7 @@ curl -s -X POST localhost:8888/api/v1/task-service/tasks \
 { "id": 1 }
 ```
 
-### `GET /tasks` — список задач (без пагинации)
+### `GET /tasks` — list all tasks (no pagination yet)
 
 ```bash
 curl -s localhost:8888/api/v1/task-service/tasks
@@ -140,97 +141,97 @@ curl -s localhost:8888/api/v1/task-service/tasks
 }
 ```
 
-### `GET /tasks/{id}` — получить задачу по id
+### `GET /tasks/{id}` — get a task by id
 
 ```bash
 curl -s localhost:8888/api/v1/task-service/tasks/1
 ```
 
-Ошибки возвращаются JSON-объектом `{ "errorMessage": "...", "status": 4xx, "timestamp": "..." }`.
+Errors are returned as `{ "errorMessage": "...", "status": 4xx, "timestamp": "..." }`.
 
-Полная спецификация доступна в Swagger UI — см. [Swagger](#swagger).
+Full specification is available in the Swagger UI — see [Swagger](#swagger).
 
-## Локальный запуск
+## Local run
 
-Понадобится: Docker, Docker Compose, [Task](https://taskfile.dev/installation/) (`brew install go-task` / `go install github.com/go-task/task/v3/cmd/task@latest`).
+Requirements: Docker, Docker Compose, [Task](https://taskfile.dev/installation/) (`brew install go-task` / `go install github.com/go-task/task/v3/cmd/task@latest`).
 
 ```bash
-# Поднять Postgres + миграции + сервис
+# Bring up Postgres + migrations + service
 task deploy:local
 
-# Проверить
+# Smoke test
 curl localhost:8888/api/v1/task-service/tasks
 
-# Логи
+# Logs
 task deploy:local:logs
 
-# Остановить и удалить тома
+# Stop and remove volumes
 task deploy:local:down
 ```
 
-Или без Docker:
+Without Docker:
 
 ```bash
-cp .env.example .env  # отредактируйте DB_POSTGRES_DSN под локальный Postgres
-task db:up            # накатить миграции
-task build            # собрать бинарник в ./bin/server
-./bin/server          # запустить
+cp .env.example .env  # edit DB_POSTGRES_DSN to point at your local Postgres
+task db:up            # apply migrations
+task build            # produce the binary at ./bin/server
+./bin/server          # run
 ```
 
-## Тесты
+## Tests
 
 ```bash
-# Unit (быстрые, без БД)
+# Unit (fast, no DB)
 task tests
-task tests:coverage   # + HTML-отчёт + проверка порога
+task tests:coverage   # + HTML report + threshold check
 
-# Integration (поднимает test-стек, ходит в реальный Postgres)
+# Integration (boots the test stack, hits real Postgres)
 task integration-tests
 task integration-tests:coverage
 ```
 
-Целевые пороги покрытия (настраиваются через ENV перед `task default`):
+Coverage thresholds (override via ENV before `task default`):
 
-- `MIN_UNIT_COVERAGE` — по умолчанию **50%**
-- `MIN_INTEGRATION_COVERAGE` — по умолчанию **30%**
+- `MIN_UNIT_COVERAGE` — defaults to **50%**
+- `MIN_INTEGRATION_COVERAGE` — defaults to **30%**
 
-Из подсчёта исключаются `/docs/`, `main.go`, `/dto/` (см. `COVERAGE_EXCLUDE` в [Taskfile.yml](Taskfile.yml)).
+`/docs/`, `main.go`, `/dto/` are excluded from the total (see `COVERAGE_EXCLUDE` in [Taskfile.yml](Taskfile.yml)).
 
-Integration-тесты помечены build-tag'ом `integration` и запускаются отдельно. Они ожидают Postgres на `127.0.0.1:5433` (поднимается через `deployment/test/docker-compose.yml`); DSN можно переопределить через `TEST_DB_POSTGRES_DSN`.
+Integration tests are guarded by the `integration` build tag and live in a separate package. They expect Postgres at `127.0.0.1:5433` (the test compose file exposes it); override via `TEST_DB_POSTGRES_DSN`.
 
-## Линтер
+## Linter
 
 ```bash
-task lint        # запустить
-task lint:fix    # запустить с автофиксами
+task lint        # run
+task lint:fix    # run with autofixes
 ```
 
-Конфиг — [.golangci.yml](.golangci.yml). Включены: `errcheck`, `staticcheck`, `revive`, `gosec`, `gocritic`, `gocyclo`, `bodyclose`, `nilerr`, `errorlint`, `prealloc`, `testifylint`, `testpackage`, `tparallel`, `forbidigo` (запрет `fmt.Print*`, `errors.Wrap`), `depguard` (запрет `pkg/errors`) и др. Форматтеры: `gci`, `gofmt`, `gofumpt`, `goimports`.
+Config: [.golangci.yml](.golangci.yml). Enabled: `errcheck`, `staticcheck`, `revive`, `gosec`, `gocritic`, `gocyclo`, `bodyclose`, `nilerr`, `errorlint`, `prealloc`, `testifylint`, `testpackage`, `tparallel`, `forbidigo` (forbids `fmt.Print*`, `errors.Wrap`), `depguard` (forbids `pkg/errors`) and more. Formatters: `gci`, `gofmt`, `gofumpt`, `goimports`.
 
-## Сборка
+## Build
 
 ```bash
-# Локальный бинарник (./bin/server)
+# Local binary (./bin/server)
 task build
 
-# Docker-образ (target=app)
+# Docker image (target=app)
 task build:docker
 ```
 
-Dockerfile [build/server/Dockerfile](build/server/Dockerfile) — multi-stage:
+[build/server/Dockerfile](build/server/Dockerfile) is multi-stage:
 
 - `builder` — `golang:1.26.3-alpine`, `go build`
-- `goose-builder` — устанавливает goose в отдельный layer
-- `app` — `alpine:3.20` с собранным бинарником, запускается под user `app`
-- `migrate` — `alpine:3.20` с goose и каталогом `/migrations`
+- `goose-builder` — installs goose in its own layer
+- `app` — `alpine:3.20` with the built binary, runs as user `app`
+- `migrate` — `alpine:3.20` with goose and `/migrations`
 
-## Деплой
+## Deploy
 
-Два compose-сценария:
+Two compose scenarios.
 
 ### Local (`deployment/local/docker-compose.yml`)
 
-Поднимает Postgres + миграции + сервис, пробрасывает `:8888`.
+Brings up Postgres + migrations + service, exposes `:8888`.
 
 ```bash
 task deploy:local
@@ -239,7 +240,7 @@ task deploy:local:down
 
 ### Test (`deployment/test/docker-compose.yml`)
 
-Поднимает только Postgres + миграции с прокинутым наружу `:5433`. Используется командой `task integration-tests`, которая поднимает стек, прогоняет `tests/integration/`, останавливает стек.
+Brings up only Postgres + migrations with `:5433` exposed. Used by `task integration-tests`, which boots the stack, runs `tests/integration/`, then tears it down.
 
 ```bash
 task deploy:test
@@ -248,69 +249,70 @@ task deploy:test:down
 
 ## Swagger
 
-Swagger UI доступен по адресу `http://localhost:8888/swagger/index.html` после поднятия сервиса.
+Swagger UI is served at `http://localhost:8888/swagger/index.html` once the service is up.
 
-Чтобы обновить документацию из аннотаций в коде:
+Regenerate docs from code annotations:
 
 ```bash
 task swag:gen
 ```
 
-Это вызовет `swag init -g cmd/main.go -o docs --parseInternal --parseDependency`, что регенерирует `docs/docs.go`, `docs/swagger.json`, `docs/swagger.yaml`. Сгенерированные файлы коммитятся в репозиторий, чтобы CI и локальные сборки не зависели от установки `swag` на машине.
+This runs `swag init -g cmd/main.go -o docs --parseInternal --parseDependency`, regenerating `docs/docs.go`, `docs/swagger.json`, `docs/swagger.yaml`. The generated files are committed so CI and local builds do not depend on `swag` being installed on the machine.
 
-Аннотации:
+Annotations live in:
 
-- общие (title/version/host/basePath) — в [cmd/main.go](cmd/main.go);
-- эндпоинты — в [internal/server/task.go](internal/server/task.go) над методами `ListTasks`, `GetTask`, `CreateTask`.
+- shared meta (title / version / host / basePath) — [cmd/main.go](cmd/main.go);
+- endpoints — [internal/server/task.go](internal/server/task.go) above `ListTasks`, `GetTask`, `CreateTask`.
 
-## Миграции БД
+## Database migrations
 
-Используется `goose`, миграции лежат в [db/migrations](db/migrations).
+`goose` manages migrations under [db/migrations](db/migrations).
 
 ```bash
-# Применить все pending миграции
+# Apply pending migrations
 task db:up
 
-# Откатить последнюю
+# Rollback the last one
 task db:down
 
-# Статус
+# Status
 task db:status
 
-# Создать новую миграцию (sql)
+# Create a new sql migration
 task db:create -- create_indexes
 ```
 
-`GOOSE_DBSTRING` подхватывается из `.env` (см. [.env.example](.env.example)).
+`GOOSE_DBSTRING` is sourced from `.env` (see [.env.example](.env.example)).
 
-В контейнере миграции применяются отдельным сервисом `task-service-migrate` из compose-файла, который запускается перед `task-service` (через `depends_on: condition: service_completed_successfully`).
+In containers, migrations are applied by a dedicated `task-service-migrate` service that runs before `task-service` (via `depends_on: condition: service_completed_successfully`).
 
 ## CI/CD
 
-[.github/workflows/ci.yml](.github/workflows/ci.yml) триггерится на `push` в `main`/`master` и `pull_request`. Jobs:
+[.github/workflows/ci.yml](.github/workflows/ci.yml) triggers on `push` to `main`/`master` and `pull_request`. Jobs:
 
-| Job | Что делает |
+| Job | What it does |
 |---|---|
-| `lint` | `golangci-lint-action` |
-| `unit-tests` | `go test -race -coverprofile`, проверка порога покрытия, upload coverage artifact |
-| `integration-tests` | поднимает Postgres как `service`, накатывает миграции через goose, прогоняет тесты с тегом `integration` |
-| `build` | `docker buildx build` обоих target'ов Dockerfile (`app` + `migrate`) |
+| `fmt` | `task fmt:check` — fails if `gofmt`/`goimports` finds unformatted files |
+| `lint` | `task lint` |
+| `unit-tests` | `task tests`, coverage threshold check, coverage artifact upload |
+| `integration-tests` | brings up Postgres as a `service`, applies migrations via goose, runs the `integration`-tagged tests |
+| `build` | `docker buildx build` of both Dockerfile targets (`app` + `migrate`) |
 | `security` | `govulncheck` |
 
-## Соглашения и ограничения
+## Conventions and limitations
 
-- **Постоянный кэш + сорт по id.** Эвикция работает по лимиту памяти (cleanup срабатывает на 90%, дропается 1/5 самых старых записей сорта по ключу). Кэш ожидает что ключ — auto-increment id.
-- **Список без пагинации.** `GET /tasks` отдаёт всё что есть (cache + остаток в БД). Это ок для PoC, но не для прода.
-- **Не-валидируемые DTO.** Тэги `binding:"required"` сейчас не используются (нет валидатора). См. [BUGS.md](BUGS.md) #10.
-- **Известные баги.** Подробный список — [BUGS.md](BUGS.md).
+- **Auto-increment cache.** Eviction is memory-driven (cleanup triggers at 90%, drops 1/5 of the oldest by key). The cache assumes auto-increment ids.
+- **Unpaginated list.** `GET /tasks` returns everything (cache + tail from DB). Fine for a PoC, not for production.
+- **DTO validation is missing.** `binding:"required"` tags are unused (no validator is wired up). See [BUGS.md](BUGS.md) #10.
+- **Known bugs.** Full list — [BUGS.md](BUGS.md).
 
 ## Roadmap
 
-- [ ] Пагинация для `GET /tasks` (`limit`/`offset`/`cursor`).
-- [ ] Валидация входных DTO через `go-playground/validator`.
-- [ ] Метрики Prometheus (`/metrics`).
+- [ ] Pagination for `GET /tasks` (`limit`/`offset`/`cursor`).
+- [ ] Input DTO validation via `go-playground/validator`.
+- [ ] Prometheus metrics (`/metrics`).
 - [ ] Distributed tracing (OpenTelemetry).
-- [ ] Аутентификация (JWT / API token).
-- [ ] PATCH/DELETE задач.
-- [ ] Лимиты на размер тела запроса и rate limiting.
-- [ ] Использовать sentinel `ErrNotFound` вместо `task.ID == 0` (см. [BUGS.md](BUGS.md) #11).
+- [ ] Authentication (JWT / API token).
+- [ ] PATCH/DELETE for tasks.
+- [ ] Request body size limits and rate limiting.
+- [ ] Replace `task.ID == 0` not-found detection with a sentinel `ErrNotFound` (see [BUGS.md](BUGS.md) #11).
