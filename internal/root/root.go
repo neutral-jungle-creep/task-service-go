@@ -69,7 +69,10 @@ func (r *Root) RegisterStopHandler(stopHandler func()) {
 }
 
 func (r *Root) startBackgroundJobs() chan error {
-	errors := make(chan error)
+	// buffered so every background job can report its error without blocking
+	// once Run has already returned via ctx.Done() — otherwise extra goroutines
+	// would leak waiting on send.
+	errors := make(chan error, len(r.backgroundJobs))
 
 	for _, job := range r.backgroundJobs {
 		go func() {
