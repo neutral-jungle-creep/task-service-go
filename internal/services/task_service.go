@@ -60,8 +60,21 @@ func (s *TaskService) List() ([]*domain.Task, error) {
 	}
 	s.logger.AsyncDebug(fmt.Sprintf("list %d tasks from repository", len(tasksFromDb)))
 
-	tasksFromDb = append(tasksFromDb, tasksFromCache...)
-	return tasksFromDb, nil
+	// Cache cleanup may have moved firstKey forward between the cache snapshot
+	// and the repository query, so rows in the overlapping range can appear in
+	// both lists. Dedupe by id, preferring the (fresher) cache copy.
+	seen := make(map[uint64]struct{}, len(tasksFromCache))
+	for _, t := range tasksFromCache {
+		seen[t.ID] = struct{}{}
+	}
+	merged := make([]*domain.Task, 0, len(tasksFromDb)+len(tasksFromCache))
+	for _, t := range tasksFromDb {
+		if _, dup := seen[t.ID]; !dup {
+			merged = append(merged, t)
+		}
+	}
+	merged = append(merged, tasksFromCache...)
+	return merged, nil
 }
 
 func (s *TaskService) Get(id uint64) (*domain.Task, error) {

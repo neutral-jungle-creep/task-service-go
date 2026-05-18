@@ -26,7 +26,12 @@ type Ordered interface {
 }
 
 // Cache is a thread-safe in-memory cache keyed by an Ordered type.
+//
+// snapshotMu serialises List/Cleanup so callers that read both items and
+// firstKey see a consistent pair. Store/Get remain lock-free on the
+// underlying sync.Map.
 type Cache[K Ordered, V Sized] struct {
+	snapshotMu            sync.RWMutex
 	items                 sync.Map
 	len                   atomic.Uint64
 	cleanupStartMB        uint64
@@ -74,8 +79,12 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 	return v, true
 }
 
-// List returns a snapshot of all values plus the smallest key currently kept.
+// List returns a snapshot of all values plus the smallest key currently
+// kept, atomically with respect to Cleanup.
 func (c *Cache[K, V]) List() ([]V, uint64) {
+	c.snapshotMu.RLock()
+	defer c.snapshotMu.RUnlock()
+
 	out := make([]V, 0, c.len.Load())
 	c.items.Range(func(_, value any) bool {
 		v, ok := value.(V)
@@ -136,8 +145,12 @@ func (c *Cache[K, V]) Run(ctx context.Context) error {
 
 // Cleanup drops the oldest 1/5 of the entries. Works for any key set —
 // including non-contiguous ids — by sorting current keys ascending and
-// removing the first N.
+// removing the first N. Holds snapshotMu so concurrent List sees either the
+// pre-cleanup or the post-cleanup state, never a partial view.
 func (c *Cache[K, V]) Cleanup() {
+	c.snapshotMu.Lock()
+	defer c.snapshotMu.Unlock()
+
 	toRemove := int(c.len.Load() / 5) // drop the oldest 20% of cached records
 	if toRemove == 0 {
 		return

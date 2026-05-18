@@ -174,7 +174,7 @@ w.WriteHeader(http.StatusNotFound)
 
 ## 9. Race condition: чтение `firstTaskKey` в `TaskService.List`
 
-**Severity:** Medium
+**Severity:** Medium → ✅ **Исправлено**
 **Файл:** [internal/services/tast_service.go](internal/services/tast_service.go), метод `List`.
 
 **Проблема.**
@@ -247,6 +247,6 @@ if params.Name == "" || params.Body == "" {
 | 6 | cmd/main.go | Medium | panic на init | `log.Fatalf` | ✅ исправлено |
 | 7 | internal/root/root.go | Medium | leak горутин при множественных ошибках | буферизованный канал | ✅ исправлено |
 | 8 | pkg/http/server/router.go | Medium | 405 вместо 404 + статические сегменты | пройти по другим методам, сравнить сегменты | ✅ исправлено |
-| 9 | internal/services/tast_service.go | Medium | гонка `firstTaskKey` vs cleanup | snapshot под локом |
+| 9 | internal/services/task_service.go | Medium | гонка `firstTaskKey` vs cleanup | snapshot под локом + дедупликация | ✅ исправлено |
 | 10 | internal/server/dto/dto.go | Low | `binding:"required"` без валидатора | validator или ручная проверка |
 | 11 | internal/adapters/repositories/task_repository.go | Low | not-found через `ID == 0` | sentinel ErrNotFound |
