@@ -46,7 +46,7 @@ for key := firstStoredKey; key < cleanupCount; key++ { // works only for auto-in
 
 ## 5. `domain.Task.Size()` — не учитывает реальный размер строк
 
-**Severity:** Medium
+**Severity:** Medium → ✅ **Исправлено** (Size учитывает длину строк; `fill` budget теперь в байтах)
 **Файл:** [internal/domain/task.go](internal/domain/task.go), метод `Size()`.
 
 **Проблема.**
@@ -243,7 +243,7 @@ if params.Name == "" || params.Body == "" {
 | 2 | internal/server/task.go | High | нет return после 400 | добавить `return` | ✅ исправлено |
 | 3 | pkg/cache/cache.go | Medium | cleanup ломается на разрывах; len не трекается | sort + drop oldest N; LoadOrStore inc len | ✅ исправлено |
 | 4 | internal/services/tast_service.go | Low | опечатка имени файла | переименовать | ✅ исправлено |
-| 5 | internal/domain/task.go | Medium | Size без длины строк | `len(Name)+len(Body)+...` |
+| 5 | internal/domain/task.go | Medium | Size без длины строк | `len(Name)+len(Body)+...` | ✅ исправлено |
 | 6 | cmd/main.go | Medium | panic на init | `log.Fatalf` |
 | 7 | internal/root/root.go | Medium | leak горутин при множественных ошибках | буферизованный канал |
 | 8 | pkg/http/server/router.go | Medium | 405 вместо 404 + статические сегменты | пройти по другим методам, сравнить сегменты |

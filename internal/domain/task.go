@@ -38,14 +38,17 @@ const (
 )
 
 func (t *Task) Size() uint64 {
-	size := uintptr(0)
+	// Struct headers (string headers store ptr+len, time.Time is fixed-size).
+	size := uint64(unsafe.Sizeof(*t))
 
-	size += unsafe.Sizeof(t.ID)
-	size += unsafe.Sizeof(t.Name)
-	size += unsafe.Sizeof(t.Body)
-	size += unsafe.Sizeof(t.Status)
-	size += unsafe.Sizeof(t.CreatedAt)
-	size += unsafe.Sizeof(t.UpdatedAt)
+	// String backing arrays — these dominate footprint for non-trivial tasks.
+	size += uint64(len(t.Name))
+	size += uint64(len(t.Body))
+	size += uint64(len(t.Status))
 
-	return uint64(size)
+	// UpdatedAt header is already in unsafe.Sizeof(*t); add the time.Time payload it points to.
+	if t.UpdatedAt != nil {
+		size += uint64(unsafe.Sizeof(*t.UpdatedAt))
+	}
+	return size
 }

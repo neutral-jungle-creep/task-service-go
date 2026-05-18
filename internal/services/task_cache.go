@@ -64,10 +64,13 @@ func (t *TaskCache) fill(repository ports.TaskRepository) error {
 		return err
 	}
 
+	// budget is 90% of the cleanup threshold, converted from MB to bytes —
+	// task.Size() returns bytes, so the comparison must be in bytes too.
+	budget := t.inner.CleanupStartMB() * 1024 * 1024 * 9 / 10
 	var totalSize uint64
 	for _, task := range tasks {
 		totalSize += task.Size()
-		if totalSize >= uint64(float32(t.inner.CleanupStartMB())*0.9) {
+		if totalSize >= budget {
 			break
 		}
 		t.inner.Store(task.ID, task)
