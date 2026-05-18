@@ -67,7 +67,7 @@ func (r *TaskRepository) Get(id uint64) (*domain.Task, error) {
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return &domain.Task{}, nil
+			return nil, domain.ErrTaskNotFound
 		}
 		return nil, fmt.Errorf("get task: %w", err)
 	}

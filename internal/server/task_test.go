@@ -176,7 +176,7 @@ func TestApi_GetTask_NotFound(t *testing.T) {
 	t.Parallel()
 
 	svc := &stubService{
-		getFunc: func(uint64) (*domain.Task, error) { return &domain.Task{}, nil },
+		getFunc: func(uint64) (*domain.Task, error) { return nil, domain.ErrTaskNotFound },
 	}
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, routeGroup+"/tasks/999", http.NoBody)

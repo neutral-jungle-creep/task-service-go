@@ -226,7 +226,7 @@ if params.Name == "" || params.Body == "" {
 
 ## 11. Потенциальный баг при пустой записи в БД (`Get` возвращает `&Task{}` вместо ошибки)
 
-**Severity:** Low
+**Severity:** Low → ✅ **Исправлено** (введён `domain.ErrTaskNotFound`, репозиторий возвращает его при `sql.ErrNoRows`, хендлер ловит через `errors.Is`)
 **Файл:** [internal/adapters/repositories/task_repository.go](internal/adapters/repositories/task_repository.go), метод `Get`.
 
 **Проблема.** При `sql.ErrNoRows` репозиторий возвращает `&domain.Task{}, nil`. Хендлер `GetTask` в `task.go` опирается на `task.ID == 0` чтобы понять "не нашли". Это работает, но семантически "0 = не найдено" — соглашение, не контракт. Если кто-то поменяет логику генерации id (например, репозиторий начнёт возвращать 0 как валидный id или для сообщения о другой ошибке) — клиенты получат 404 вместо реальной ошибки.
@@ -249,4 +249,4 @@ if params.Name == "" || params.Body == "" {
 | 8 | pkg/http/server/router.go | Medium | 405 вместо 404 + статические сегменты | пройти по другим методам, сравнить сегменты | ✅ исправлено |
 | 9 | internal/services/task_service.go | Medium | гонка `firstTaskKey` vs cleanup | snapshot под локом + дедупликация | ✅ исправлено |
 | 10 | internal/server/dto/dto.go | Low | `binding:"required"` без валидатора | validator или ручная проверка | ✅ исправлено |
-| 11 | internal/adapters/repositories/task_repository.go | Low | not-found через `ID == 0` | sentinel ErrNotFound |
+| 11 | internal/adapters/repositories/task_repository.go | Low | not-found через `ID == 0` | sentinel ErrNotFound | ✅ исправлено |

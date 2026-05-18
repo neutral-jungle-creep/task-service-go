@@ -68,14 +68,11 @@ func (api *API) GetTask(w http.ResponseWriter, r *http.Request) {
 
 	task, err := api.taskService.Get(id)
 	if err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			protocol.SendErrorResponse(w, http.StatusNotFound, "", err)
+			return
+		}
 		protocol.SendErrorResponse(w, http.StatusInternalServerError, internalServerError, err)
-		return
-	}
-
-	// not-found is detected here (and not inside the service) so that the service can stay
-	// quiet about missing rows and other callers can decide on their own how to react
-	if task.ID == 0 {
-		protocol.SendErrorResponse(w, http.StatusNotFound, "", errors.New("task not found"))
 		return
 	}
 

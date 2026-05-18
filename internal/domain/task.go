@@ -1,9 +1,14 @@
 package domain
 
 import (
+	"errors"
 	"time"
 	"unsafe"
 )
+
+// ErrTaskNotFound is returned by repositories/services when the requested
+// task does not exist. HTTP handlers translate it to 404.
+var ErrTaskNotFound = errors.New("task not found")
 
 type Task struct {
 	ID        uint64

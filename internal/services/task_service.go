@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 
 	"task-service/internal/domain"
@@ -86,6 +87,10 @@ func (s *TaskService) Get(id uint64) (*domain.Task, error) {
 
 	task, err := s.repository.Get(id)
 	if err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			s.logger.AsyncDebug(fmt.Sprintf("task %d not found", id))
+			return nil, err
+		}
 		s.logger.AsyncError("failed to get task", err)
 		return nil, err
 	}
