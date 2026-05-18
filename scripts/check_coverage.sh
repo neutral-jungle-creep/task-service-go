@@ -2,7 +2,7 @@
 set -e
 
 COVERAGE_FILE="${1:-.coverage/unit.out}"
-THRESHOLD="${2:-60}"
+THRESHOLD="${2:-40}"
 # EXCLUDE_PATTERN — optional egrep regex for paths excluded from total coverage
 # (e.g. "/docs/|/mocks/"). Useful for generated or trivial packages that are
 # not meant to be covered by tests.

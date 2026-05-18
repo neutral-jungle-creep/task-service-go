@@ -185,9 +185,8 @@ task build            # produce the binary at ./bin/server
 task tests
 task tests:coverage   # + HTML report + threshold check
 
-# Integration (boots the test stack, hits real Postgres)
+# Integration (boots the test stack, hits real Postgres; HTML report + threshold check)
 task integration-tests
-task integration-tests:coverage
 ```
 
 Coverage thresholds (override via ENV before `task default`):
