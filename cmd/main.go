@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"os/signal"
 	"syscall"
 
@@ -29,12 +30,12 @@ func main() {
 
 	cfg, err := config.NewConfigFromFile(config.DotEnvFilename())
 	if err != nil {
-		panic(err)
+		log.Fatalf("load config: %v", err)
 	}
 
 	logger, err := logging.NewLogger(cfg.LogLevel, cfg.ServiceName, cfg.ReleaseID)
 	if err != nil {
-		panic(err)
+		log.Fatalf("init logger: %v", err)
 	}
 
 	application, err := root.New(ctx, cfg, logger)

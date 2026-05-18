@@ -85,7 +85,7 @@ func (t *Task) Size() uint64 {
 
 ## 6. `cmd/main.go` — `panic` на init-ошибках
 
-**Severity:** Medium
+**Severity:** Medium → ✅ **Исправлено**
 **Файл:** [cmd/main.go](cmd/main.go).
 
 **Проблема.**
@@ -244,7 +244,7 @@ if params.Name == "" || params.Body == "" {
 | 3 | pkg/cache/cache.go | Medium | cleanup ломается на разрывах; len не трекается | sort + drop oldest N; LoadOrStore inc len | ✅ исправлено |
 | 4 | internal/services/tast_service.go | Low | опечатка имени файла | переименовать | ✅ исправлено |
 | 5 | internal/domain/task.go | Medium | Size без длины строк | `len(Name)+len(Body)+...` | ✅ исправлено |
-| 6 | cmd/main.go | Medium | panic на init | `log.Fatalf` |
+| 6 | cmd/main.go | Medium | panic на init | `log.Fatalf` | ✅ исправлено |
 | 7 | internal/root/root.go | Medium | leak горутин при множественных ошибках | буферизованный канал |
 | 8 | pkg/http/server/router.go | Medium | 405 вместо 404 + статические сегменты | пройти по другим методам, сравнить сегменты |
 | 9 | internal/services/tast_service.go | Medium | гонка `firstTaskKey` vs cleanup | snapshot под локом |
