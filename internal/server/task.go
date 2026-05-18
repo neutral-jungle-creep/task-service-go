@@ -108,6 +108,12 @@ func (api *API) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if params == nil || params.Name == "" || params.Body == "" {
+		protocol.SendErrorResponse(w, http.StatusBadRequest, incorrectRequestBodyError,
+			errors.New("name and body are required"))
+		return
+	}
+
 	id, err := api.taskService.Create(domain.NewTask(params.Name, params.Body))
 	if err != nil {
 		protocol.SendErrorResponse(w, http.StatusInternalServerError, internalServerError, err)

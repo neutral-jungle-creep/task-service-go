@@ -17,8 +17,8 @@ type GetTaskResponse struct {
 }
 
 type CreateTaskRequest struct {
-	Name string `json:"name" binding:"required"`
-	Body string `json:"body" binding:"required"`
+	Name string `json:"name"`
+	Body string `json:"body"`
 }
 
 type CreateTaskResponse struct {

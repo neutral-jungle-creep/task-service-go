@@ -199,7 +199,7 @@ tasksFromDb, err := s.repository.List(&ports.ListTasksFilter{ ToID: firstTaskKey
 
 ## 10. Валидация DTO: `binding:"required"` без валидатора
 
-**Severity:** Low
+**Severity:** Low → ✅ **Исправлено** (тэг убран, добавлена явная проверка `Name != "" && Body != ""`)
 **Файл:** [internal/server/dto/dto.go](internal/server/dto/dto.go).
 
 **Проблема.**
@@ -248,5 +248,5 @@ if params.Name == "" || params.Body == "" {
 | 7 | internal/root/root.go | Medium | leak горутин при множественных ошибках | буферизованный канал | ✅ исправлено |
 | 8 | pkg/http/server/router.go | Medium | 405 вместо 404 + статические сегменты | пройти по другим методам, сравнить сегменты | ✅ исправлено |
 | 9 | internal/services/task_service.go | Medium | гонка `firstTaskKey` vs cleanup | snapshot под локом + дедупликация | ✅ исправлено |
-| 10 | internal/server/dto/dto.go | Low | `binding:"required"` без валидатора | validator или ручная проверка |
+| 10 | internal/server/dto/dto.go | Low | `binding:"required"` без валидатора | validator или ручная проверка | ✅ исправлено |
 | 11 | internal/adapters/repositories/task_repository.go | Low | not-found через `ID == 0` | sentinel ErrNotFound |
