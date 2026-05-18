@@ -143,7 +143,7 @@ errors := make(chan error, len(r.backgroundJobs))
 
 ## 8. `router.go` — некорректное различение 404 vs 405
 
-**Severity:** Medium
+**Severity:** Medium → ✅ **Исправлено**
 **Файл:** [pkg/http/server/router.go](pkg/http/server/router.go), `ServeHTTP`.
 
 **Проблема.**
@@ -246,7 +246,7 @@ if params.Name == "" || params.Body == "" {
 | 5 | internal/domain/task.go | Medium | Size без длины строк | `len(Name)+len(Body)+...` | ✅ исправлено |
 | 6 | cmd/main.go | Medium | panic на init | `log.Fatalf` | ✅ исправлено |
 | 7 | internal/root/root.go | Medium | leak горутин при множественных ошибках | буферизованный канал | ✅ исправлено |
-| 8 | pkg/http/server/router.go | Medium | 405 вместо 404 + статические сегменты | пройти по другим методам, сравнить сегменты |
+| 8 | pkg/http/server/router.go | Medium | 405 вместо 404 + статические сегменты | пройти по другим методам, сравнить сегменты | ✅ исправлено |
 | 9 | internal/services/tast_service.go | Medium | гонка `firstTaskKey` vs cleanup | snapshot под локом |
 | 10 | internal/server/dto/dto.go | Low | `binding:"required"` без валидатора | validator или ручная проверка |
 | 11 | internal/adapters/repositories/task_repository.go | Low | not-found через `ID == 0` | sentinel ErrNotFound |

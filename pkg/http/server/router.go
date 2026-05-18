@@ -35,8 +35,11 @@ func (r *Router) Register(method, pattern string, handler http.HandlerFunc) {
 }
 
 func matchPattern(pattern, path string) (bool, map[string]string) {
-	if !strings.Contains(pattern, "{") && !strings.Contains(pattern, "}") && pattern == path {
-		return true, nil // request without path parameters
+	if !strings.Contains(pattern, "{") && !strings.Contains(pattern, "}") {
+		if pattern == path {
+			return true, nil
+		}
+		return false, nil
 	}
 
 	patternParts := strings.Split(strings.Trim(pattern, "/"), "/")
@@ -46,12 +49,17 @@ func matchPattern(pattern, path string) (bool, map[string]string) {
 		return false, nil
 	}
 
-	params := make(map[string]string)
-
-	for i := 0; i < len(patternParts); i++ {
-		if strings.HasPrefix(patternParts[i], "{") && strings.HasSuffix(patternParts[i], "}") {
-			key := strings.Trim(patternParts[i], "{}")
-			params[key] = pathParts[i]
+	var params map[string]string
+	for i, p := range patternParts {
+		if strings.HasPrefix(p, "{") && strings.HasSuffix(p, "}") {
+			if params == nil {
+				params = make(map[string]string)
+			}
+			params[strings.Trim(p, "{}")] = pathParts[i]
+			continue
+		}
+		if p != pathParts[i] {
+			return false, nil
 		}
 	}
 	return true, params
@@ -61,21 +69,29 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	path := req.URL.Path
 	method := req.Method
 
-	routesForMethod, ok := r.routes[method]
-	if ok {
+	if routesForMethod, ok := r.routes[method]; ok {
 		for _, ro := range routesForMethod {
-			matched, params := matchPattern(ro.pattern, path)
-			if matched {
+			if matched, params := matchPattern(ro.pattern, path); matched {
 				req = addParamsToContext(req, params)
 				ro.handler(w, req)
 				return
 			}
 		}
-
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
 	}
 
+	// Path may exist under a different method — then it is 405.
+	// Otherwise 404.
+	for otherMethod, routes := range r.routes {
+		if otherMethod == method {
+			continue
+		}
+		for _, ro := range routes {
+			if matched, _ := matchPattern(ro.pattern, path); matched {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+		}
+	}
 	w.WriteHeader(http.StatusNotFound)
 }
 
