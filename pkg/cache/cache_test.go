@@ -80,6 +80,44 @@ func TestCache_RunStopsOnContextCancel(t *testing.T) {
 	}
 }
 
+func TestCache_Cleanup_DropsOldest(t *testing.T) {
+	t.Parallel()
+
+	c := newCache(t)
+	for i := uint64(1); i <= 10; i++ {
+		c.Store(i, &item{id: i, size: 1})
+	}
+
+	c.Cleanup() // 20% of 10 == 2 oldest
+
+	assert.Equal(t, uint64(8), c.Len())
+	_, ok := c.Get(1)
+	assert.False(t, ok, "id 1 should be evicted")
+	_, ok = c.Get(2)
+	assert.False(t, ok, "id 2 should be evicted")
+	_, ok = c.Get(3)
+	assert.True(t, ok, "id 3 must survive")
+	assert.Equal(t, uint64(3), c.FirstKey())
+}
+
+func TestCache_Cleanup_HandlesGaps(t *testing.T) {
+	t.Parallel()
+
+	c := newCache(t)
+	for _, id := range []uint64{1, 5, 17, 42, 100} {
+		c.Store(id, &item{id: id, size: 1})
+	}
+
+	c.Cleanup() // 20% of 5 == 1; oldest (id=1) removed
+
+	assert.Equal(t, uint64(4), c.Len())
+	_, ok := c.Get(1)
+	assert.False(t, ok)
+	_, ok = c.Get(5)
+	assert.True(t, ok)
+	assert.Equal(t, uint64(5), c.FirstKey())
+}
+
 func TestCache_ConcurrentStore(t *testing.T) {
 	t.Parallel()
 

@@ -8,7 +8,7 @@
 
 ## 3. `task_cache.go` — `cleanup()` ломается при разрывах в id
 
-**Severity:** Medium → **Уже исправлено в `pkg/cache`**
+**Severity:** Medium → ✅ **Исправлено**
 **Файл (старый):** `internal/services/task_cache.go` — функция `cleanup()`.
 
 **Проблема (исторически).**
@@ -241,7 +241,7 @@ if params.Name == "" || params.Body == "" {
 |---|---|---|---|---|---|
 | 1 | pkg/http/protocol/protocol.go | High | WriteHeader после Write | поменять порядок | ✅ исправлено |
 | 2 | internal/server/task.go | High | нет return после 400 | добавить `return` | ✅ исправлено |
-| 3 | internal/services/task_cache.go (старое) | Medium | cleanup ломается на разрывах | sort + drop oldest N (уже в pkg/cache) | |
+| 3 | pkg/cache/cache.go | Medium | cleanup ломается на разрывах; len не трекается | sort + drop oldest N; LoadOrStore inc len | ✅ исправлено |
 | 4 | internal/services/tast_service.go | Low | опечатка имени файла | переименовать |
 | 5 | internal/domain/task.go | Medium | Size без длины строк | `len(Name)+len(Body)+...` |
 | 6 | cmd/main.go | Medium | panic на init | `log.Fatalf` |
