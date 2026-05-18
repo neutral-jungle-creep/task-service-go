@@ -35,8 +35,8 @@ for key := firstStoredKey; key < cleanupCount; key++ { // works only for auto-in
 
 ## 4. Опечатка в имени файла: `tast_service.go`
 
-**Severity:** Low
-**Файл:** [internal/services/tast_service.go](internal/services/tast_service.go).
+**Severity:** Low → ✅ **Исправлено** (переименован в `task_service.go`)
+**Файл:** `internal/services/tast_service.go` → [internal/services/task_service.go](internal/services/task_service.go).
 
 **Проблема.** Очевидная опечатка: должно быть `task_service.go`.
 
@@ -242,7 +242,7 @@ if params.Name == "" || params.Body == "" {
 | 1 | pkg/http/protocol/protocol.go | High | WriteHeader после Write | поменять порядок | ✅ исправлено |
 | 2 | internal/server/task.go | High | нет return после 400 | добавить `return` | ✅ исправлено |
 | 3 | pkg/cache/cache.go | Medium | cleanup ломается на разрывах; len не трекается | sort + drop oldest N; LoadOrStore inc len | ✅ исправлено |
-| 4 | internal/services/tast_service.go | Low | опечатка имени файла | переименовать |
+| 4 | internal/services/tast_service.go | Low | опечатка имени файла | переименовать | ✅ исправлено |
 | 5 | internal/domain/task.go | Medium | Size без длины строк | `len(Name)+len(Body)+...` |
 | 6 | cmd/main.go | Medium | panic на init | `log.Fatalf` |
 | 7 | internal/root/root.go | Medium | leak горутин при множественных ошибках | буферизованный канал |
