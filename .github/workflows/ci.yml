@@ -70,7 +70,7 @@ jobs:
         run: task tests
 
       - name: Check coverage threshold
-        run: bash scripts/check_coverage.sh .coverage/unit.out 50 '/docs/|main\.go|/dto/'
+        run: bash scripts/check_coverage.sh .coverage/unit.out 50 '/docs/|main\.go|/dto/|/internal/root/'
 
       - uses: actions/upload-artifact@v4
         if: always()

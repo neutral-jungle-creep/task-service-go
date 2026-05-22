@@ -48,38 +48,19 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ### 2. Улучшить покрытие тестами
 
-**Текущий замер (CI прогон):**
+**Целевая планка:** ≥75% по всем пакетам, кроме `cmd`, `docs`, `ports`, `dto`, `internal/root` (исключены из подсчёта).
 
-| Пакет | Coverage |
-|---|---|
-| `task-service/cmd` | 0.0% |
-| `task-service/docs` | 0.0% (генерируется) |
-| `task-service/internal/adapters/repositories` | 0.0% |
-| `task-service/internal/config` | 83.3% |
-| `task-service/internal/domain` | 100% |
-| `task-service/internal/ports` | без тестов (только interfaces) |
-| `task-service/internal/root` | 0.0% |
-| `task-service/internal/server` | ~88% |
-| `task-service/internal/services` | требует прогона после фикса helper-а |
-| `task-service/pkg/cache` | 80.3% |
-| `task-service/pkg/http/protocol` | 57.9% |
-| `task-service/pkg/http/server` | 70.5% |
-| `task-service/pkg/logging` | 73.8% |
-| `task-service/pkg/postgres` | 70.0% |
+**Сделано (ветка `feature/expand-test-coverage`):**
 
-**Целевая планка:** ≥75% по всем пакетам, кроме `cmd`, `docs`, `ports`, `dto` (исключены из подсчёта).
+- `internal/adapters/repositories` — unit-тесты через `go-sqlmock`: Store/Get/List, все ветки `buildListQuery`, `sql.ErrNoRows` → `ErrTaskNotFound`, ошибки query/scan/iteration.
+- `pkg/http/protocol` — добавлена ветка `MarshalError` для `SendSuccessResponse` через тип с `MarshalJSON`, возвращающим ошибку.
+- `pkg/http/server` router — пустой роутер, lowercase method, multi-`{param}`, разные статические сегменты, разное число сегментов, разные методы на одном пути, `RequestParams` без контекста.
+- `pkg/cache` — Cleanup при `len < 5` (no-op), пустом кэше, `Store` overwrite, `Run` без интервала, `Run` cancel.
+- `internal/root` — вынесен в `COVERAGE_EXCLUDE` (DI-wiring, покрывается integration-тестами).
 
-**Что покрыть в первую очередь:**
+**Остаётся открытым:**
 
-- **`internal/adapters/repositories`** — 0%. Сейчас тестируется только через integration-тесты. Добавить unit-тесты через `sqlmock` (`github.com/DATA-DOG/go-sqlmock`) на все ветки `Store/Get/List/buildListQuery`, включая `sql.ErrNoRows` → `ErrTaskNotFound` и ошибки сканирования.
-- **`internal/root`** — 0%. DI-wiring сложно тестировать в чистом виде, но `New()` можно прогнать с тестовыми компонентами (in-memory cache, mock repo, mock logger). Альтернатива — оставить вне coverage-подсчёта.
-- **`pkg/http/protocol`** (57.9%) — есть ветки маршалинга ошибки, которые не покрыты. Можно через хитрый `json.Marshaler`, возвращающий ошибку.
-- **`pkg/http/server` router** (70.5%) — добавить тесты на пустые routes, дубликаты регистрации, пути без `/` префикса, многосегментные `{param}`.
-- **`pkg/cache`** (80.3%) — добавить тест на Cleanup при `len < 5` (toRemove == 0), на Run с реальной memory pressure через искусственное аллоцирование.
-
-**Инструменты:**
-- `go-sqlmock` для repository unit-тестов.
-- `testcontainers-go` (опционально) — позволил бы поднимать Postgres внутри юнит-теста репозитория без внешнего docker-compose, но это размывает границу unit vs integration.
+- **`testcontainers-go` для repository unit-тестов.** Альтернатива sqlmock — поднять Postgres внутри теста без внешнего docker-compose, чтобы получить реальные query-execution планы (а не сравнение строк SQL). Минусы: 5-10 секунд старта контейнера на тест-сьют, требует Docker на машине разработчика и в CI. Решение про подключение — отдельный PR, когда станет узким местом разница между sqlmock и реальным Postgres.
 
 ---
 

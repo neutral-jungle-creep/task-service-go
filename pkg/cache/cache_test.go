@@ -100,6 +100,73 @@ func TestCache_Cleanup_DropsOldest(t *testing.T) {
 	assert.Equal(t, uint64(3), c.FirstKey())
 }
 
+func TestCache_Cleanup_NoOpWhenBelowFive(t *testing.T) {
+	t.Parallel()
+
+	c := newCache(t)
+	for i := uint64(1); i <= 4; i++ {
+		c.Store(i, &item{id: i, size: 1})
+	}
+
+	c.Cleanup() // toRemove = 4/5 = 0, must not touch anything
+
+	assert.Equal(t, uint64(4), c.Len())
+	_, ok := c.Get(1)
+	assert.True(t, ok)
+	assert.Equal(t, uint64(1), c.FirstKey())
+}
+
+func TestCache_Cleanup_EmptyCacheNoOp(t *testing.T) {
+	t.Parallel()
+
+	c := newCache(t)
+	assert.NotPanics(t, func() { c.Cleanup() })
+	assert.Equal(t, uint64(0), c.Len())
+}
+
+func TestCache_Cleanup_RemovesAllWhenSmall(t *testing.T) {
+	t.Parallel()
+
+	c := newCache(t)
+	// 5 items → toRemove = 1; after cleanup len=4, firstKey=2
+	for i := uint64(1); i <= 5; i++ {
+		c.Store(i, &item{id: i, size: 1})
+	}
+	c.Cleanup()
+	assert.Equal(t, uint64(4), c.Len())
+	assert.Equal(t, uint64(2), c.FirstKey())
+}
+
+func TestCache_Run_NoIntervalWaitsForCtx(t *testing.T) {
+	t.Parallel()
+
+	c := cache.New[uint64, *item](64, 0) // monitorInterval == 0 → just block on ctx
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- c.Run(ctx) }()
+
+	cancel()
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("Run did not exit after ctx cancel")
+	}
+}
+
+func TestCache_Store_UpdateExisting(t *testing.T) {
+	t.Parallel()
+
+	c := newCache(t)
+	c.Store(7, &item{id: 7, size: 10})
+	c.Store(7, &item{id: 7, size: 99}) // overwrite, len must stay 1
+
+	assert.Equal(t, uint64(1), c.Len())
+	got, ok := c.Get(7)
+	require.True(t, ok)
+	assert.Equal(t, uint64(99), got.size)
+}
+
 func TestCache_Cleanup_HandlesGaps(t *testing.T) {
 	t.Parallel()
 
