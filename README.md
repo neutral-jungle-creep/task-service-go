@@ -196,7 +196,7 @@ Coverage thresholds (override via ENV before `task default`):
 - `MIN_UNIT_COVERAGE` — defaults to **50%**
 - `MIN_INTEGRATION_COVERAGE` — defaults to **30%**
 
-`/docs/`, `main.go`, `/dto/` are excluded from the total (see `COVERAGE_EXCLUDE` in [Taskfile.yml](Taskfile.yml)).
+`/docs/`, `main.go`, `/dto/`, `/internal/root/` are excluded from the total (see `COVERAGE_EXCLUDE` in [Taskfile.yml](Taskfile.yml)).
 
 Integration tests are guarded by the `integration` build tag and live in a separate package. They expect Postgres at `127.0.0.1:5433` (the test compose file exposes it); override via `TEST_DB_POSTGRES_DSN`.
 
@@ -507,7 +507,7 @@ task integration-tests
 - `MIN_UNIT_COVERAGE` — по умолчанию **50%**
 - `MIN_INTEGRATION_COVERAGE` — по умолчанию **30%**
 
-Из подсчёта исключаются `/docs/`, `main.go`, `/dto/` (см. `COVERAGE_EXCLUDE` в [Taskfile.yml](Taskfile.yml)).
+Из подсчёта исключаются `/docs/`, `main.go`, `/dto/`, `/internal/root/` (см. `COVERAGE_EXCLUDE` в [Taskfile.yml](Taskfile.yml)).
 
 Integration-тесты помечены build-tag-ом `integration` и лежат в отдельном пакете. Они ожидают Postgres на `127.0.0.1:5433` (его поднимает test-compose-файл); переопределяется через `TEST_DB_POSTGRES_DSN`.
 

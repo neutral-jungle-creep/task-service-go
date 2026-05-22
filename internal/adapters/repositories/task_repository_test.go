@@ -1,0 +1,251 @@
+package repositories_test
+
+import (
+	"database/sql"
+	"errors"
+	"regexp"
+	"testing"
+	"time"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"task-service/internal/adapters/repositories"
+	"task-service/internal/domain"
+	"task-service/internal/ports"
+)
+
+func newMock(t *testing.T) (sqlmock.Sqlmock, *repositories.TaskRepository) {
+	t.Helper()
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	return mock, repositories.NewTaskRepository(db)
+}
+
+func TestTaskRepository_Store_OK(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	created := time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)
+	task := &domain.Task{
+		Name:      "n",
+		Body:      "b",
+		Status:    domain.TaskStatusNew,
+		CreatedAt: created,
+	}
+
+	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO tasks")).
+		WithArgs("n", "b", string(domain.TaskStatusNew), created, task.UpdatedAt).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
+
+	id, err := repo.Store(task)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(42), id)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Store_DBError(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO tasks")).
+		WillReturnError(errors.New("connection refused"))
+
+	id, err := repo.Store(&domain.Task{Name: "x", Body: "y", Status: domain.TaskStatusNew, CreatedAt: time.Now()})
+	require.Error(t, err)
+	assert.Zero(t, id)
+	assert.Contains(t, err.Error(), "store task")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Get_OK(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	created := time.Date(2024, 2, 3, 4, 5, 6, 0, time.UTC)
+	updated := time.Date(2024, 3, 4, 5, 6, 7, 0, time.UTC)
+
+	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"}).
+		AddRow(int64(7), "n", "b", "IN_PROCESS", created, updated)
+
+	mock.ExpectQuery(`SELECT .* FROM tasks WHERE id = \$1`).
+		WithArgs(uint64(7)).
+		WillReturnRows(rows)
+
+	task, err := repo.Get(7)
+	require.NoError(t, err)
+	require.NotNil(t, task)
+	assert.Equal(t, uint64(7), task.ID)
+	assert.Equal(t, "n", task.Name)
+	assert.Equal(t, "b", task.Body)
+	assert.Equal(t, domain.TaskStatusInProcess, task.Status)
+	assert.Equal(t, created, task.CreatedAt)
+	require.NotNil(t, task.UpdatedAt)
+	assert.Equal(t, updated, *task.UpdatedAt)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Get_NotFound(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectQuery(`SELECT .* FROM tasks WHERE id = \$1`).
+		WithArgs(uint64(999)).
+		WillReturnError(sql.ErrNoRows)
+
+	task, err := repo.Get(999)
+	require.ErrorIs(t, err, domain.ErrTaskNotFound)
+	assert.Nil(t, task)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Get_DBError(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectQuery(`SELECT .* FROM tasks WHERE id = \$1`).
+		WithArgs(uint64(1)).
+		WillReturnError(errors.New("timeout"))
+
+	task, err := repo.Get(1)
+	require.Error(t, err)
+	require.NotErrorIs(t, err, domain.ErrTaskNotFound)
+	assert.Nil(t, task)
+	assert.Contains(t, err.Error(), "get task")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_List_NoFilter_ASC(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"}).
+		AddRow(int64(1), "a", "aa", "NEW", time.Now(), nil).
+		AddRow(int64(2), "b", "bb", "COMPLETE", time.Now(), nil)
+
+	mock.ExpectQuery(`SELECT .* FROM tasks\s+ORDER BY id ASC\s+LIMIT \$1`).
+		WithArgs(1000).
+		WillReturnRows(rows)
+
+	tasks, err := repo.List(nil)
+	require.NoError(t, err)
+	require.Len(t, tasks, 2)
+	assert.Equal(t, uint64(1), tasks[0].ID)
+	assert.Equal(t, uint64(2), tasks[1].ID)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_List_Desc(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"})
+
+	mock.ExpectQuery(`SELECT .* FROM tasks\s+ORDER BY id DESC\s+LIMIT \$1`).
+		WithArgs(1000).
+		WillReturnRows(rows)
+
+	tasks, err := repo.List(&ports.ListTasksFilter{Sort: ports.SortDesc})
+	require.NoError(t, err)
+	assert.Empty(t, tasks)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_List_ToID_ASC(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"}).
+		AddRow(int64(5), "a", "aa", "NEW", time.Now(), nil)
+
+	mock.ExpectQuery(`SELECT .* FROM tasks\s+WHERE id < \$1\s+ORDER BY id ASC\s+LIMIT \$2`).
+		WithArgs(uint64(10), 1000).
+		WillReturnRows(rows)
+
+	tasks, err := repo.List(&ports.ListTasksFilter{ToID: 10})
+	require.NoError(t, err)
+	require.Len(t, tasks, 1)
+	assert.Equal(t, uint64(5), tasks[0].ID)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_List_ToID_Desc(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"})
+
+	mock.ExpectQuery(`SELECT .* FROM tasks\s+WHERE id < \$1\s+ORDER BY id DESC\s+LIMIT \$2`).
+		WithArgs(uint64(10), 1000).
+		WillReturnRows(rows)
+
+	_, err := repo.List(&ports.ListTasksFilter{Sort: ports.SortDesc, ToID: 10})
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_List_QueryError(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectQuery(`SELECT .* FROM tasks`).
+		WillReturnError(errors.New("boom"))
+
+	tasks, err := repo.List(nil)
+	require.Error(t, err)
+	assert.Nil(t, tasks)
+	assert.Contains(t, err.Error(), "list tasks")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_List_ScanError(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	// id column has a value that cannot scan into uint64
+	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"}).
+		AddRow("not-a-number", "n", "b", "NEW", time.Now(), nil)
+
+	mock.ExpectQuery(`SELECT .* FROM tasks`).
+		WithArgs(1000).
+		WillReturnRows(rows)
+
+	tasks, err := repo.List(nil)
+	require.Error(t, err)
+	assert.Nil(t, tasks)
+	assert.Contains(t, err.Error(), "scan task")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_List_RowsErr(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"}).
+		AddRow(int64(1), "n", "b", "NEW", time.Now(), nil).
+		RowError(0, errors.New("row iteration failed"))
+
+	mock.ExpectQuery(`SELECT .* FROM tasks`).
+		WithArgs(1000).
+		WillReturnRows(rows)
+
+	tasks, err := repo.List(nil)
+	require.Error(t, err)
+	assert.Nil(t, tasks)
+	assert.Contains(t, err.Error(), "iterate tasks")
+	require.NoError(t, mock.ExpectationsWereMet())
+}

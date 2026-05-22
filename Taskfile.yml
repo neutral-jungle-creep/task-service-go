@@ -11,7 +11,9 @@ vars:
     sh: 'echo ${MIN_UNIT_COVERAGE:-50}'
   MIN_INTEGRATION_COVERAGE:
     sh: 'echo ${MIN_INTEGRATION_COVERAGE:-30}'
-  COVERAGE_EXCLUDE: '/docs/|main\.go|/dto/'
+  # /docs/ — generated swagger; /dto/ — plain structs; /internal/root/ — DI wiring,
+  # exercised by integration tests; main.go — boot only.
+  COVERAGE_EXCLUDE: '/docs/|main\.go|/dto/|/internal/root/'
 
   GOLANGCI_VERSION: v2.5.0
   GOOSE_VERSION: v3.22.1
@@ -31,7 +33,7 @@ tasks:
       - task: tidy
       - task: fmt
       - task: lint
-      - task: tests
+      - task: tests:coverage
       - task: build
 
   # ============================================================================
