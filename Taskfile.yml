@@ -123,7 +123,7 @@ tasks:
       - task: deploy:test
       - defer: { task: deploy:test:down }
       - mkdir -p {{.COVERAGE_DIR}}
-      - TEST_DB_POSTGRES_DSN='{{.TEST_DB_POSTGRES_DSN}}' go test -tags=integration -race -count=1 -coverprofile={{.COVERAGE_DIR}}/integration.out ./tests/integration/...
+      - TEST_DB_POSTGRES_DSN='{{.TEST_DB_POSTGRES_DSN}}' go test -tags=integration -race -count=1 -v -coverprofile={{.COVERAGE_DIR}}/integration.out -coverpkg=./internal/...,./pkg/... ./tests/integration/...
       - go tool cover -html={{.COVERAGE_DIR}}/integration.out -o {{.COVERAGE_DIR}}/integration.html
       - bash scripts/check_coverage.sh {{.COVERAGE_DIR}}/integration.out {{.MIN_INTEGRATION_COVERAGE}} '{{.COVERAGE_EXCLUDE}}'
 
@@ -173,16 +173,25 @@ tasks:
   # DATABASE / MIGRATIONS (goose)
   # ============================================================================
   db:up:
+    env:
+      GOOSE_DRIVER: '{{.GOOSE_DRIVER}}'
+      GOOSE_DBSTRING: '{{.GOOSE_DBSTRING}}'
     cmds:
-      - go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} {{.GOOSE_DRIVER}} '{{.GOOSE_DBSTRING}}' up
+      - go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} up
 
   db:down:
+    env:
+      GOOSE_DRIVER: '{{.GOOSE_DRIVER}}'
+      GOOSE_DBSTRING: '{{.GOOSE_DBSTRING}}'
     cmds:
-      - go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} {{.GOOSE_DRIVER}} '{{.GOOSE_DBSTRING}}' down
+      - go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} down
 
   db:status:
+    env:
+      GOOSE_DRIVER: '{{.GOOSE_DRIVER}}'
+      GOOSE_DBSTRING: '{{.GOOSE_DBSTRING}}'
     cmds:
-      - go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} {{.GOOSE_DRIVER}} '{{.GOOSE_DBSTRING}}' status
+      - go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} status
 
   db:create:
     cmds:

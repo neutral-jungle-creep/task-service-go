@@ -110,14 +110,17 @@ jobs:
         run: |
           go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
             -dir ./db/migrations \
-            postgres "$GOOSE_DBSTRING" up
+            up
 
       - name: Run integration tests
         env:
           TEST_DB_POSTGRES_DSN: "host=127.0.0.1 port=5433 user=user password=user_password dbname=task-service-test sslmode=disable"
         run: |
           mkdir -p .coverage
-          go test -tags=integration -race -count=1 -coverprofile=.coverage/integration.out ./tests/integration/...
+          go test -tags=integration -race -count=1 -v \
+            -coverprofile=.coverage/integration.out \
+            -coverpkg=./internal/...,./pkg/... \
+            ./tests/integration/...
 
       - uses: actions/upload-artifact@v4
         if: always()
