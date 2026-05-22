@@ -145,6 +145,65 @@ func rawCreate(url string, payload dto.CreateTaskRequest) concurrentCreateResult
 	return concurrentCreateResult{id: c.ID, status: resp.StatusCode}
 }
 
+func TestIntegration_ListPagination(t *testing.T) {
+	env := setupTestEnv(t)
+	defer env.close(t)
+
+	base := env.server.URL + "/api/v1/task-service/tasks"
+
+	// Seed 7 tasks
+	for i := 0; i < 7; i++ {
+		var c dto.CreateTaskResponse
+		status := doJSON(t, http.MethodPost, base,
+			dto.CreateTaskRequest{Name: "n-" + strconv.Itoa(i), Body: "b"}, &c)
+		require.Equal(t, http.StatusOK, status)
+		require.NotZero(t, c.ID)
+	}
+
+	// First page
+	var page1 dto.ListTasksResponse
+	status := doJSON(t, http.MethodGet, base+"?limit=3&offset=0", nil, &page1)
+	require.Equal(t, http.StatusOK, status)
+	require.Len(t, page1.Items, 3)
+	assert.Equal(t, uint64(3), page1.Limit)
+	assert.Equal(t, uint64(0), page1.Offset)
+	assert.GreaterOrEqual(t, page1.Total, uint64(7))
+
+	// Second page
+	var page2 dto.ListTasksResponse
+	status = doJSON(t, http.MethodGet, base+"?limit=3&offset=3", nil, &page2)
+	require.Equal(t, http.StatusOK, status)
+	require.Len(t, page2.Items, 3)
+	assert.Equal(t, page1.Total, page2.Total)
+
+	// Pages must not overlap by id
+	firstIDs := map[uint64]struct{}{}
+	for _, it := range page1.Items {
+		firstIDs[it.ID] = struct{}{}
+	}
+	for _, it := range page2.Items {
+		_, dup := firstIDs[it.ID]
+		assert.False(t, dup, "id %d appears in both pages", it.ID)
+	}
+
+	// Beyond last page → empty list, total stays
+	var tail dto.ListTasksResponse
+	status = doJSON(t, http.MethodGet, base+"?limit=10&offset=1000", nil, &tail)
+	require.Equal(t, http.StatusOK, status)
+	assert.Empty(t, tail.Items)
+	assert.Equal(t, page1.Total, tail.Total)
+}
+
+func TestIntegration_ListBadLimit(t *testing.T) {
+	env := setupTestEnv(t)
+	defer env.close(t)
+
+	base := env.server.URL + "/api/v1/task-service/tasks"
+
+	status := doJSON(t, http.MethodGet, base+"?limit=501", nil, nil)
+	require.Equal(t, http.StatusBadRequest, status)
+}
+
 func TestIntegration_ConcurrentCreates(t *testing.T) {
 	env := setupTestEnv(t)
 	defer env.close(t)

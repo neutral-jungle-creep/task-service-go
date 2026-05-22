@@ -19,7 +19,7 @@ import (
 
 type stubService struct {
 	createFunc func(*domain.Task) (uint64, error)
-	listFunc   func() ([]*domain.Task, error)
+	listFunc   func(limit, offset uint64) ([]*domain.Task, uint64, error)
 	getFunc    func(uint64) (*domain.Task, error)
 }
 
@@ -30,11 +30,11 @@ func (s *stubService) Create(t *domain.Task) (uint64, error) {
 	return 1, nil
 }
 
-func (s *stubService) List() ([]*domain.Task, error) {
+func (s *stubService) List(limit, offset uint64) ([]*domain.Task, uint64, error) {
 	if s.listFunc != nil {
-		return s.listFunc()
+		return s.listFunc(limit, offset)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 
 func (s *stubService) Get(id uint64) (*domain.Task, error) {
@@ -115,12 +115,14 @@ func TestApi_CreateTask_ServiceError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 }
 
-func TestApi_ListTasks_OK(t *testing.T) {
+func TestApi_ListTasks_OK_DefaultPagination(t *testing.T) {
 	t.Parallel()
 
 	svc := &stubService{
-		listFunc: func() ([]*domain.Task, error) {
-			return []*domain.Task{{ID: 1, Name: "a"}, {ID: 2, Name: "b"}}, nil
+		listFunc: func(limit, offset uint64) ([]*domain.Task, uint64, error) {
+			assert.Equal(t, uint64(50), limit)
+			assert.Equal(t, uint64(0), offset)
+			return []*domain.Task{{ID: 1, Name: "a"}, {ID: 2, Name: "b"}}, 17, nil
 		},
 	}
 
@@ -132,15 +134,71 @@ func TestApi_ListTasks_OK(t *testing.T) {
 
 	var resp dto.ListTasksResponse
 	require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
-	assert.Equal(t, uint64(2), resp.Total)
+	assert.Equal(t, uint64(17), resp.Total)
+	assert.Equal(t, uint64(50), resp.Limit)
+	assert.Equal(t, uint64(0), resp.Offset)
 	assert.Len(t, resp.Items, 2)
+}
+
+func TestApi_ListTasks_OK_CustomPagination(t *testing.T) {
+	t.Parallel()
+
+	svc := &stubService{
+		listFunc: func(limit, offset uint64) ([]*domain.Task, uint64, error) {
+			assert.Equal(t, uint64(10), limit)
+			assert.Equal(t, uint64(20), offset)
+			return []*domain.Task{}, 30, nil
+		},
+	}
+
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet,
+		routeGroup+"/tasks?limit=10&offset=20", http.NoBody)
+	rec := httptest.NewRecorder()
+	newTestServer(t, svc).ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var resp dto.ListTasksResponse
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
+	assert.Equal(t, uint64(10), resp.Limit)
+	assert.Equal(t, uint64(20), resp.Offset)
+}
+
+func TestApi_ListTasks_BadLimit(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]string{
+		"non-numeric":   "abc",
+		"zero":          "0",
+		"above max 500": "501",
+	}
+	for name, raw := range cases {
+		t.Run(name, func(t *testing.T) {
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet,
+				routeGroup+"/tasks?limit="+raw, http.NoBody)
+			rec := httptest.NewRecorder()
+			newTestServer(t, &stubService{}).ServeHTTP(rec, req)
+			assert.Equal(t, http.StatusBadRequest, rec.Code)
+		})
+	}
+}
+
+func TestApi_ListTasks_BadOffset(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet,
+		routeGroup+"/tasks?offset=-1", http.NoBody)
+	rec := httptest.NewRecorder()
+	newTestServer(t, &stubService{}).ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
 func TestApi_ListTasks_ServiceError(t *testing.T) {
 	t.Parallel()
 
 	svc := &stubService{
-		listFunc: func() ([]*domain.Task, error) { return nil, errors.New("oops") },
+		listFunc: func(uint64, uint64) ([]*domain.Task, uint64, error) {
+			return nil, 0, errors.New("oops")
+		},
 	}
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, routeGroup+"/tasks", http.NoBody)
