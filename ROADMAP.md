@@ -46,72 +46,19 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 2. Улучшить покрытие тестами
+### 2. `testcontainers-go` для repository unit-тестов
 
-**Целевая планка:** ≥75% по всем пакетам, кроме `cmd`, `docs`, `ports`, `dto`, `internal/root` (исключены из подсчёта).
+**Что:** альтернатива sqlmock — поднять реальный Postgres внутри теста через `testcontainers-go` (без зависимости от внешнего docker-compose), чтобы получить реальные query-execution планы вместо сравнения строк SQL.
 
-**Сделано (ветка `feature/expand-test-coverage`):**
+**Минусы:** 5-10 секунд старта контейнера на тест-сьют; требует Docker на машине разработчика и в CI. Решение про подключение — отдельный PR, когда станет узким местом разница между sqlmock и реальным Postgres.
 
-- `internal/adapters/repositories` — unit-тесты через `go-sqlmock`: Store/Get/List, все ветки `buildListQuery`, `sql.ErrNoRows` → `ErrTaskNotFound`, ошибки query/scan/iteration.
-- `pkg/http/protocol` — добавлена ветка `MarshalError` для `SendSuccessResponse` через тип с `MarshalJSON`, возвращающим ошибку.
-- `pkg/http/server` router — пустой роутер, lowercase method, multi-`{param}`, разные статические сегменты, разное число сегментов, разные методы на одном пути, `RequestParams` без контекста.
-- `pkg/cache` — Cleanup при `len < 5` (no-op), пустом кэше, `Store` overwrite, `Run` без интервала, `Run` cancel.
-- `internal/root` — вынесен в `COVERAGE_EXCLUDE` (DI-wiring, покрывается integration-тестами).
-
-**Остаётся открытым:**
-
-- **`testcontainers-go` для repository unit-тестов.** Альтернатива sqlmock — поднять Postgres внутри теста без внешнего docker-compose, чтобы получить реальные query-execution планы (а не сравнение строк SQL). Минусы: 5-10 секунд старта контейнера на тест-сьют, требует Docker на машине разработчика и в CI. Решение про подключение — отдельный PR, когда станет узким местом разница между sqlmock и реальным Postgres.
-
----
-
-### 3. Разобраться с миграциями goose в CI
-
-**Что:** integration-tests job в CI падает на накатывании миграций:
-
-```
-go: downloading github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec
-2026/05/22 10:22:33 goose run: "postgres": no such command
-exit status 1
-```
-
-**Где смотреть:** [.github/workflows/ci.yml](.github/workflows/ci.yml) job `integration-tests`, шаг `Apply migrations`:
-
-```yaml
-go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
-  -dir ./db/migrations \
-  postgres "$GOOSE_DBSTRING" up
-```
-
-**Корень проблемы.** В свежих версиях goose v3 driver и DSN передаются не позиционно, а через переменные окружения `GOOSE_DRIVER`/`GOOSE_DBSTRING` (они уже выставлены в окружении job-а). После этого команда становится `goose -dir <path> up`, без слова `postgres` и без явного DSN. Старый синтаксис `goose ... postgres "dsn" up` отпал, отсюда `"postgres": no such command`.
-
-**Что сделать:**
-- В CI поменять команду на `goose -dir ./db/migrations up` (driver+DSN уже в env);
-- Аналогично пройтись по таргетам `db:up`/`db:down`/`db:status` в [Taskfile.yml](Taskfile.yml) — там тоже передаём DSN позиционно (`goose ... postgres '<dsn>' up`), что сломается на той же версии. Перевести на env-mode и убрать позиционные аргументы;
-- В Dockerfile (target `migrate`) ENTRYPOINT уже использует позиционный DSN — переписать на env-вариант, чтобы compose `task-service-migrate` сервис продолжал работать.
-- Зафиксировать версию goose в одном месте (например, vars `GOOSE_VERSION` в Taskfile уже есть — её и тиражировать в CI и Dockerfile).
-
-**Проверка:** `task deploy:test` + `task integration-tests` локально должны проходить без падения миграций; CI `integration-tests` job — зелёный.
+**Целевая планка покрытия:** ≥75% по всем пакетам, кроме `cmd`, `docs`, `ports`, `dto`, `internal/root` (исключены из подсчёта).
 
 ---
 
 ## Roadmap фич
 
-### 4. Пагинация для `GET /tasks` (`limit` / `offset` / `cursor`)
-
-**Что:** добавить query-параметры `?limit=N&offset=M` (страничная навигация) или `?cursor=ID` (курсорная) для list-эндпоинта.
-
-**Где:**
-- `internal/server/dto/dto.go` — добавить `ListTasksQuery { Limit, Offset, Cursor uint64 }`, парсинг из `r.URL.Query()`.
-- `internal/ports/task_repository.go` — расширить `ListTasksFilter` полями `Limit`, `Offset`, либо `Cursor`.
-- `internal/services/task_service.go` — учесть в `List`: если limit задан, сначала пробуем кеш в этой границе, потом docорим из БД.
-- `internal/adapters/repositories/task_repository.go` — `LIMIT $N OFFSET $M` в SQL.
-- Swagger-аннотации в `internal/server/task.go`.
-
-**Решение про default limit:** разумно 50, max — 500. Превышение → 400.
-
----
-
-### 5. Валидация входных DTO через `go-playground/validator`
+### 3. Валидация входных DTO через `go-playground/validator`
 
 **Что:** заменить ручную проверку в `CreateTask` на тэги + единую функцию валидации.
 
@@ -125,7 +72,7 @@ go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
 
 ---
 
-### 6. Метрики Prometheus (`/metrics`)
+### 4. Метрики Prometheus (`/metrics`)
 
 **Что:** инструментация HTTP и БД, выкладывание `/metrics` эндпоинта.
 
@@ -138,7 +85,7 @@ go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
 
 ---
 
-### 7. Distributed tracing (OpenTelemetry)
+### 5. Distributed tracing (OpenTelemetry)
 
 **Что:** трассировка запросов через OTEL SDK с экспортом в Jaeger/Tempo.
 
@@ -152,7 +99,7 @@ go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
 
 ---
 
-### 8. Аутентификация (JWT / API token)
+### 6. Аутентификация (JWT / API token)
 
 **Что:** middleware проверки токена; неавторизованные запросы → 401.
 
@@ -166,7 +113,7 @@ go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
 
 ---
 
-### 9. PATCH / DELETE для задач
+### 7. PATCH / DELETE для задач
 
 **Что:** добавить ручки `PATCH /tasks/{id}` и `DELETE /tasks/{id}`.
 
