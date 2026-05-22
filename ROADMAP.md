@@ -138,7 +138,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 10. Лимит размера тела запроса и rate limiting
+### 8. Лимит размера тела запроса и rate limiting
 
 **Размер тела:**
 - В `internal/server/task.go` — `r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)` перед `io.ReadAll`.
