@@ -16,18 +16,18 @@ import (
 	"task-service/internal/ports"
 )
 
-func newMock(t *testing.T) (*sql.DB, sqlmock.Sqlmock, *repositories.TaskRepository) {
+func newMock(t *testing.T) (sqlmock.Sqlmock, *repositories.TaskRepository) {
 	t.Helper()
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
-	return db, mock, repositories.NewTaskRepository(db)
+	return mock, repositories.NewTaskRepository(db)
 }
 
 func TestTaskRepository_Store_OK(t *testing.T) {
 	t.Parallel()
 
-	_, mock, repo := newMock(t)
+	mock, repo := newMock(t)
 
 	created := time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)
 	task := &domain.Task{
@@ -50,7 +50,7 @@ func TestTaskRepository_Store_OK(t *testing.T) {
 func TestTaskRepository_Store_DBError(t *testing.T) {
 	t.Parallel()
 
-	_, mock, repo := newMock(t)
+	mock, repo := newMock(t)
 
 	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO tasks")).
 		WillReturnError(errors.New("connection refused"))
@@ -65,7 +65,7 @@ func TestTaskRepository_Store_DBError(t *testing.T) {
 func TestTaskRepository_Get_OK(t *testing.T) {
 	t.Parallel()
 
-	_, mock, repo := newMock(t)
+	mock, repo := newMock(t)
 
 	created := time.Date(2024, 2, 3, 4, 5, 6, 0, time.UTC)
 	updated := time.Date(2024, 3, 4, 5, 6, 7, 0, time.UTC)
@@ -93,15 +93,14 @@ func TestTaskRepository_Get_OK(t *testing.T) {
 func TestTaskRepository_Get_NotFound(t *testing.T) {
 	t.Parallel()
 
-	_, mock, repo := newMock(t)
+	mock, repo := newMock(t)
 
 	mock.ExpectQuery(`SELECT .* FROM tasks WHERE id = \$1`).
 		WithArgs(uint64(999)).
 		WillReturnError(sql.ErrNoRows)
 
 	task, err := repo.Get(999)
-	require.Error(t, err)
-	assert.ErrorIs(t, err, domain.ErrTaskNotFound)
+	require.ErrorIs(t, err, domain.ErrTaskNotFound)
 	assert.Nil(t, task)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
@@ -109,7 +108,7 @@ func TestTaskRepository_Get_NotFound(t *testing.T) {
 func TestTaskRepository_Get_DBError(t *testing.T) {
 	t.Parallel()
 
-	_, mock, repo := newMock(t)
+	mock, repo := newMock(t)
 
 	mock.ExpectQuery(`SELECT .* FROM tasks WHERE id = \$1`).
 		WithArgs(uint64(1)).
@@ -117,7 +116,7 @@ func TestTaskRepository_Get_DBError(t *testing.T) {
 
 	task, err := repo.Get(1)
 	require.Error(t, err)
-	assert.NotErrorIs(t, err, domain.ErrTaskNotFound)
+	require.NotErrorIs(t, err, domain.ErrTaskNotFound)
 	assert.Nil(t, task)
 	assert.Contains(t, err.Error(), "get task")
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -126,7 +125,7 @@ func TestTaskRepository_Get_DBError(t *testing.T) {
 func TestTaskRepository_List_NoFilter_ASC(t *testing.T) {
 	t.Parallel()
 
-	_, mock, repo := newMock(t)
+	mock, repo := newMock(t)
 
 	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"}).
 		AddRow(int64(1), "a", "aa", "NEW", time.Now(), nil).
@@ -147,7 +146,7 @@ func TestTaskRepository_List_NoFilter_ASC(t *testing.T) {
 func TestTaskRepository_List_Desc(t *testing.T) {
 	t.Parallel()
 
-	_, mock, repo := newMock(t)
+	mock, repo := newMock(t)
 
 	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"})
 
@@ -164,7 +163,7 @@ func TestTaskRepository_List_Desc(t *testing.T) {
 func TestTaskRepository_List_ToID_ASC(t *testing.T) {
 	t.Parallel()
 
-	_, mock, repo := newMock(t)
+	mock, repo := newMock(t)
 
 	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"}).
 		AddRow(int64(5), "a", "aa", "NEW", time.Now(), nil)
@@ -183,7 +182,7 @@ func TestTaskRepository_List_ToID_ASC(t *testing.T) {
 func TestTaskRepository_List_ToID_Desc(t *testing.T) {
 	t.Parallel()
 
-	_, mock, repo := newMock(t)
+	mock, repo := newMock(t)
 
 	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"})
 
@@ -199,7 +198,7 @@ func TestTaskRepository_List_ToID_Desc(t *testing.T) {
 func TestTaskRepository_List_QueryError(t *testing.T) {
 	t.Parallel()
 
-	_, mock, repo := newMock(t)
+	mock, repo := newMock(t)
 
 	mock.ExpectQuery(`SELECT .* FROM tasks`).
 		WillReturnError(errors.New("boom"))
@@ -214,7 +213,7 @@ func TestTaskRepository_List_QueryError(t *testing.T) {
 func TestTaskRepository_List_ScanError(t *testing.T) {
 	t.Parallel()
 
-	_, mock, repo := newMock(t)
+	mock, repo := newMock(t)
 
 	// id column has a value that cannot scan into uint64
 	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"}).
@@ -234,7 +233,7 @@ func TestTaskRepository_List_ScanError(t *testing.T) {
 func TestTaskRepository_List_RowsErr(t *testing.T) {
 	t.Parallel()
 
-	_, mock, repo := newMock(t)
+	mock, repo := newMock(t)
 
 	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"}).
 		AddRow(int64(1), "n", "b", "NEW", time.Now(), nil).
