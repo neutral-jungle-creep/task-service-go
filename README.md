@@ -300,18 +300,9 @@ In containers, migrations are applied by a dedicated `task-service-migrate` serv
 
 ## Conventions and limitations
 
-- **Auto-increment cache.** Eviction is memory-driven (cleanup triggers at 90%, drops 1/5 of the oldest by key). The cache assumes auto-increment ids.
-- **Unpaginated list.** `GET /tasks` returns everything (cache + tail from DB). Fine for a PoC, not for production.
-- **DTO validation is missing.** `binding:"required"` tags are unused (no validator is wired up). See [BUGS.md](BUGS.md) #10.
-- **Known bugs.** Full list — [BUGS.md](BUGS.md).
+- **Cache eviction.** Memory-driven — cleanup triggers at 90% of the configured limit and drops 1/5 of the oldest entries (sorted by key).
+- **Unpaginated list.** `GET /tasks` returns everything (cache + tail from DB). Fine for a PoC, not for production — pagination is in [ROADMAP.md](ROADMAP.md).
 
 ## Roadmap
 
-- [ ] Pagination for `GET /tasks` (`limit`/`offset`/`cursor`).
-- [ ] Input DTO validation via `go-playground/validator`.
-- [ ] Prometheus metrics (`/metrics`).
-- [ ] Distributed tracing (OpenTelemetry).
-- [ ] Authentication (JWT / API token).
-- [ ] PATCH/DELETE for tasks.
-- [ ] Request body size limits and rate limiting.
-- [ ] Replace `task.ID == 0` not-found detection with a sentinel `ErrNotFound` (see [BUGS.md](BUGS.md) #11).
+See [ROADMAP.md](ROADMAP.md) for the next-steps backlog (pagination, validation, metrics, tracing, auth, PATCH/DELETE, rate limits, expanded coverage, `pkg/background`, Russian README).
