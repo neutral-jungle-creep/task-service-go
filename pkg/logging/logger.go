@@ -18,21 +18,20 @@ const defaultLogLevel = "info"
 type level uint8
 
 func (l level) String() string {
-	var lvl string
-
 	switch l {
-	case 0:
-		lvl = "debug"
-	case 1:
-		lvl = "info"
-	case 2:
-		lvl = "warn"
-	case 3:
-		lvl = "error"
-	case 4:
-		lvl = "fatal"
+	case DebugLevel:
+		return "debug"
+	case InfoLevel:
+		return "info"
+	case WarnLevel:
+		return "warn"
+	case ErrorLevel:
+		return "error"
+	case FatalLevel:
+		return "fatal"
+	default:
+		return ""
 	}
-	return lvl
 }
 
 func parseLogLevel(lvl string) (level, error) {
@@ -128,10 +127,7 @@ func NewLogger(logLevel, serviceName, releaseID string) (*Logger, error) {
 }
 
 func (l *Logger) checkLevel(lvl level) bool {
-	if l.config.Level > lvl {
-		return false
-	}
-	return true
+	return l.config.Level <= lvl
 }
 
 func (l *Logger) Fatal(msg string, err error) {

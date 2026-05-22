@@ -5,9 +5,7 @@ import (
 )
 
 func (r *Root) initServices() error {
-	var err error
-
-	r.services.taskCache, err = services.NewTaskCache(
+	taskCache, err := services.NewTaskCache(
 		r.config.Cache.MemoryCacheLimitMB,
 		r.config.Cache.MemoryMonitorCacheInterval,
 		r.repositories.taskRepository,
@@ -15,6 +13,9 @@ func (r *Root) initServices() error {
 	if err != nil {
 		return err
 	}
+	r.services.taskCache = taskCache
+
+	r.RegisterBackgroundJob(func() error { return taskCache.Run(r.ctx) })
 
 	r.services.taskService = services.NewTaskService(
 		r.logger,

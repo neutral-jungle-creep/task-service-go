@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: task-service-test
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: user_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data_test:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d task-service-test"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    networks:
+      - test
+
+  task-service-migrate:
+    build:
+      context: ./../..
+      dockerfile: ./build/server/Dockerfile
+      target: migrate
+    environment:
+      GOOSE_DBSTRING: "host=postgres port=5432 user=user password=user_password dbname=task-service-test sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - test
+
+volumes:
+  postgres_data_test:
+
+networks:
+  test:
+    driver: bridge

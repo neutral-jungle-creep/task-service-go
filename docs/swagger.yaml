@@ -1,0 +1,139 @@
+basePath: /api/v1/task-service
+definitions:
+  task-service_internal_server_dto.CreateTaskRequest:
+    properties:
+      body:
+        type: string
+      name:
+        type: string
+    required:
+    - body
+    - name
+    type: object
+  task-service_internal_server_dto.CreateTaskResponse:
+    properties:
+      id:
+        type: integer
+    type: object
+  task-service_internal_server_dto.GetTaskResponse:
+    properties:
+      body:
+        type: string
+      createdAt:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      status:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  task-service_internal_server_dto.ListTasksResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/task-service_internal_server_dto.GetTaskResponse'
+        type: array
+      total:
+        type: integer
+    type: object
+  task-service_pkg_http_protocol.ExceptionResponse:
+    properties:
+      errorMessage:
+        type: string
+      status:
+        type: integer
+      timestamp:
+        type: string
+    type: object
+host: localhost:8888
+info:
+  contact:
+    name: Task Service Team
+    url: https://github.com/your-org/task-service-go
+  description: CRUD service for tasks with an in-memory cache and PostgreSQL persistence.
+  license:
+    name: MIT
+  termsOfService: http://swagger.io/terms/
+  title: Task Service API
+  version: "1.0"
+paths:
+  /tasks:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/task-service_internal_server_dto.ListTasksResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/task-service_pkg_http_protocol.ExceptionResponse'
+      summary: List tasks
+      tags:
+      - tasks
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Task to create
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/task-service_internal_server_dto.CreateTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/task-service_internal_server_dto.CreateTaskResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/task-service_pkg_http_protocol.ExceptionResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/task-service_pkg_http_protocol.ExceptionResponse'
+      summary: Create task
+      tags:
+      - tasks
+  /tasks/{id}:
+    get:
+      parameters:
+      - description: Task id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/task-service_internal_server_dto.GetTaskResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/task-service_pkg_http_protocol.ExceptionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/task-service_pkg_http_protocol.ExceptionResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/task-service_pkg_http_protocol.ExceptionResponse'
+      summary: Get task by id
+      tags:
+      - tasks
+schemes:
+- http
+swagger: "2.0"

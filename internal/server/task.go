@@ -14,12 +14,20 @@ import (
 )
 
 const (
-	readRequestBodyError      = "ошибка чтения тела запроса"
-	incorrectRequestBodyError = "некорректный формат запроса"
-	internalServerError       = "внутренняя ошибка сервера"
+	readRequestBodyError      = "failed to read request body"
+	incorrectRequestBodyError = "incorrect request body"
+	internalServerError       = "internal server error"
 )
 
-func (api *Api) ListTasks(w http.ResponseWriter, _ *http.Request) {
+// ListTasks returns all tasks currently known to the service.
+//
+//	@Summary	List tasks
+//	@Tags		tasks
+//	@Produce	json
+//	@Success	200	{object}	dto.ListTasksResponse
+//	@Failure	500	{object}	protocol.ExceptionResponse
+//	@Router		/tasks [get]
+func (api *API) ListTasks(w http.ResponseWriter, _ *http.Request) {
 	tasks, err := api.taskService.List()
 	if err != nil {
 		protocol.SendErrorResponse(w, http.StatusInternalServerError, internalServerError, err)
@@ -28,12 +36,23 @@ func (api *Api) ListTasks(w http.ResponseWriter, _ *http.Request) {
 
 	response := dto.ListTasksResponse{
 		Items: tasksFromDomain(tasks),
-		Total: uint64(len(tasks)), //  когда появится пагинация, это значение будет браться из метода total репозитория
+		Total: uint64(len(tasks)), // once pagination is added this value will come from a repository total method
 	}
 	protocol.SendSuccessResponse(w, http.StatusOK, response)
 }
 
-func (api *Api) GetTask(w http.ResponseWriter, r *http.Request) {
+// GetTask returns a single task by id.
+//
+//	@Summary	Get task by id
+//	@Tags		tasks
+//	@Produce	json
+//	@Param		id	path		uint64	true	"Task id"
+//	@Success	200	{object}	dto.GetTaskResponse
+//	@Failure	400	{object}	protocol.ExceptionResponse
+//	@Failure	404	{object}	protocol.ExceptionResponse
+//	@Failure	500	{object}	protocol.ExceptionResponse
+//	@Router		/tasks/{id} [get]
+func (api *API) GetTask(w http.ResponseWriter, r *http.Request) {
 	params := server.RequestParams(r)
 	idParam := params["id"]
 	if len(idParam) == 0 {
@@ -44,19 +63,16 @@ func (api *Api) GetTask(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
 		protocol.SendErrorResponse(w, http.StatusBadRequest, incorrectRequestBodyError, err)
+		return
 	}
 
 	task, err := api.taskService.Get(id)
 	if err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			protocol.SendErrorResponse(w, http.StatusNotFound, "", err)
+			return
+		}
 		protocol.SendErrorResponse(w, http.StatusInternalServerError, internalServerError, err)
-		return
-	}
-
-	// эту штуку вынесла из слоя сервиса потому что в другом месте программы может быть полезно
-	// чтобы сервис не генерировал ошибку когда ничего не найдено, не знаю насколько мои рассуждения правильны,
-	// но мне кажется так будет лучше
-	if task.ID == 0 {
-		protocol.SendErrorResponse(w, http.StatusNotFound, "", errors.New("task not found"))
 		return
 	}
 
@@ -64,7 +80,18 @@ func (api *Api) GetTask(w http.ResponseWriter, r *http.Request) {
 	protocol.SendSuccessResponse(w, http.StatusOK, response)
 }
 
-func (api *Api) CreateTask(w http.ResponseWriter, r *http.Request) {
+// CreateTask creates a new task and returns its id.
+//
+//	@Summary	Create task
+//	@Tags		tasks
+//	@Accept		json
+//	@Produce	json
+//	@Param		payload	body		dto.CreateTaskRequest	true	"Task to create"
+//	@Success	200		{object}	dto.CreateTaskResponse
+//	@Failure	400		{object}	protocol.ExceptionResponse
+//	@Failure	500		{object}	protocol.ExceptionResponse
+//	@Router		/tasks [post]
+func (api *API) CreateTask(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		protocol.SendErrorResponse(w, http.StatusBadRequest, readRequestBodyError, err)
@@ -75,6 +102,12 @@ func (api *Api) CreateTask(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(body, &params)
 	if err != nil {
 		protocol.SendErrorResponse(w, http.StatusBadRequest, incorrectRequestBodyError, err)
+		return
+	}
+
+	if params == nil || params.Name == "" || params.Body == "" {
+		protocol.SendErrorResponse(w, http.StatusBadRequest, incorrectRequestBodyError,
+			errors.New("name and body are required"))
 		return
 	}
 

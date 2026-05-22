@@ -1,9 +1,12 @@
 package domain
 
 import (
+	"errors"
 	"time"
 	"unsafe"
 )
+
+var ErrTaskNotFound = errors.New("task not found")
 
 type Task struct {
 	ID        uint64
@@ -38,14 +41,12 @@ const (
 )
 
 func (t *Task) Size() uint64 {
-	size := uintptr(0)
-
-	size += unsafe.Sizeof(t.ID)
-	size += unsafe.Sizeof(t.Name)
-	size += unsafe.Sizeof(t.Body)
-	size += unsafe.Sizeof(t.Status)
-	size += unsafe.Sizeof(t.CreatedAt)
-	size += unsafe.Sizeof(t.UpdatedAt)
-
-	return uint64(size)
+	size := uint64(unsafe.Sizeof(*t))
+	size += uint64(len(t.Name))
+	size += uint64(len(t.Body))
+	size += uint64(len(t.Status))
+	if t.UpdatedAt != nil {
+		size += uint64(unsafe.Sizeof(*t.UpdatedAt))
+	}
+	return size
 }

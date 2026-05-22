@@ -16,24 +16,24 @@ func Port(port string) Option {
 
 func ReadTimeout(timeout time.Duration) Option {
 	return func(s *http.Server) {
-		s.ReadTimeout = timeout * time.Second
+		s.ReadTimeout = timeout
 	}
 }
 
 func WriteTimeout(timeout time.Duration) Option {
 	return func(s *http.Server) {
-		s.WriteTimeout = timeout * time.Second
+		s.WriteTimeout = timeout
 	}
 }
 
 func IdleTimeout(timeout time.Duration) Option {
 	return func(s *http.Server) {
-		s.IdleTimeout = timeout * time.Second
+		s.IdleTimeout = timeout
 	}
 }
 
 func ReadHeaderTimeout(timeout time.Duration) Option {
 	return func(s *http.Server) {
-		s.ReadHeaderTimeout = timeout * time.Second
+		s.ReadHeaderTimeout = timeout
 	}
 }

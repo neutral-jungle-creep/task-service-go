@@ -31,19 +31,17 @@ func New(ctx context.Context, config *config.Config, logger *logging.Logger) (*R
 		config: config,
 	}
 
-	err := root.initObservability(logger)
-	if err != nil {
+	root.initObservability(logger)
+
+	if err := root.initRepositories(); err != nil {
 		return nil, err
 	}
 
-	root.initRepositories()
-
-	err = root.initServices()
-	if err != nil {
+	if err := root.initServices(); err != nil {
 		return nil, err
 	}
 
-	root.initHttpServer()
+	root.initHTTPServer()
 
 	return &root, nil
 }
@@ -71,7 +69,7 @@ func (r *Root) RegisterStopHandler(stopHandler func()) {
 }
 
 func (r *Root) startBackgroundJobs() chan error {
-	errors := make(chan error)
+	errors := make(chan error, len(r.backgroundJobs))
 
 	for _, job := range r.backgroundJobs {
 		go func() {

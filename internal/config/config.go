@@ -1,64 +1,58 @@
 package config
 
 import (
-	"bytes"
-	"encoding/json"
-	"flag"
-	"io"
-	"os"
+	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
-	"task-service/pkg/http/server"
-	"task-service/pkg/logging"
+	"github.com/joho/godotenv"
+	"github.com/kelseyhightower/envconfig"
 )
 
+const dotEnvFilename = ".env"
+
 type Config struct {
-	ServiceName string         `json:"serviceName"`
-	ReleaseID   string         `json:"releaseId"`
-	Logger      logging.Config `json:"logger"`
-	HTTPServer  server.Config  `json:"httpServer"`
-	Cache       CacheConfig    `json:"cache"`
+	ServiceName string `envconfig:"SERVICE_NAME" default:"task-service-go"`
+	ReleaseID   string `envconfig:"RELEASE_ID"`
+	LogLevel    string `envconfig:"LOG_LEVEL" default:"info"`
+	RouteGroup  string `envconfig:"ROUTE_GROUP" default:"/api/v1/task-service"`
+
+	HTTPServer HTTPServerConfig `envconfig:"HTTP_SERVER"`
+	Database   DatabaseConfig   `envconfig:"DB"`
+	Cache      CacheConfig      `envconfig:"CACHE"`
+}
+
+type HTTPServerConfig struct {
+	ListenPort        string        `envconfig:"LISTEN_PORT" default:"8888"`
+	KeepAliveTime     time.Duration `envconfig:"KEEP_ALIVE_TIME" default:"60s"`
+	KeepAliveTimeout  time.Duration `envconfig:"KEEP_ALIVE_TIMEOUT" default:"10s"`
+	ReadHeaderTimeout time.Duration `envconfig:"READ_HEADER_TIMEOUT" default:"10s"`
+	ReadTimeout       time.Duration `envconfig:"READ_TIMEOUT" default:"10s"`
+	WriteTimeout      time.Duration `envconfig:"WRITE_TIMEOUT" default:"10s"`
+}
+
+type DatabaseConfig struct {
+	DSN             string        `envconfig:"POSTGRES_DSN" required:"true"`
+	MaxOpenConns    int           `envconfig:"POSTGRES_MAX_OPEN_CONNS" default:"10"`
+	MaxIdleConns    int           `envconfig:"POSTGRES_MAX_IDLE_CONNS" default:"5"`
+	ConnMaxLifetime time.Duration `envconfig:"POSTGRES_MAX_LIFETIME" default:"30m"`
+	QueryTimeout    time.Duration `envconfig:"POSTGRES_QUERY_TIMEOUT" default:"5s"`
 }
 
 type CacheConfig struct {
-	MemoryCacheLimitMB         int           `json:"memoryCacheLimitMB"`
-	MemoryMonitorCacheInterval time.Duration `json:"memoryMonitorCacheInterval"`
+	MemoryCacheLimitMB         int           `envconfig:"MEMORY_LIMIT_MB" default:"1024"`
+	MemoryMonitorCacheInterval time.Duration `envconfig:"MEMORY_MONITOR_INTERVAL" default:"5s"`
 }
 
-func NewConfigFromEnv() (*Config, error) {
-	var configPath string
+func NewConfigFromFile(fileName string) (*Config, error) {
+	_ = godotenv.Load(fileName) // local-only convenience; ignore the error so the container start path still works
 
-	flag.StringVar(&configPath, "path", "config.json", "Path to config file")
-	flag.StringVar(&configPath, "p", "config.json", "Path to config file")
-	flag.Parse()
-
-	var config Config
-
-	err := processEnv(&config, configPath)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable process env")
+	cfg := &Config{}
+	if err := envconfig.Process("", cfg); err != nil {
+		return nil, fmt.Errorf("process env: %w", err)
 	}
-
-	return &config, nil
+	return cfg, nil
 }
 
-func processEnv(config *Config, configPath string) error {
-	file, err := os.Open(configPath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, file)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(buf.Bytes(), config)
-	if err != nil {
-		return err
-	}
-	return nil
+func DotEnvFilename() string {
+	return dotEnvFilename
 }

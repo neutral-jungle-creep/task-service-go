@@ -4,7 +4,7 @@ import (
 	"task-service/pkg/logging"
 )
 
-func (r *Root) initObservability(logger *logging.Logger) error {
+func (r *Root) initObservability(logger *logging.Logger) {
 	r.logger = logging.NewAsyncLogger(
 		r.ctx,
 		logger,
@@ -16,5 +16,4 @@ func (r *Root) initObservability(logger *logging.Logger) error {
 	r.RegisterStopHandler(func() {
 		r.logger.Stop()
 	})
-	return nil
 }

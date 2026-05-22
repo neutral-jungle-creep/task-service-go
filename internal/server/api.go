@@ -5,17 +5,17 @@ import (
 	"task-service/pkg/http/server"
 )
 
-type Api struct {
+type API struct {
 	taskService ports.TaskService
 }
 
-func NewApi(taskService ports.TaskService) *Api {
-	return &Api{
+func NewAPI(taskService ports.TaskService) *API {
+	return &API{
 		taskService: taskService,
 	}
 }
 
-func (api *Api) InitRoutes(routeGroup string) *server.Router {
+func (api *API) InitRoutes(routeGroup string) *server.Router {
 	router := server.NewRouter()
 
 	router.Register("GET", routeGroup+"/tasks", api.ListTasks)
