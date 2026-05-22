@@ -93,9 +93,39 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
+### 4. Разобраться с миграциями goose в CI
+
+**Что:** integration-tests job в CI падает на накатывании миграций:
+
+```
+go: downloading github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec
+2026/05/22 10:22:33 goose run: "postgres": no such command
+exit status 1
+```
+
+**Где смотреть:** [.github/workflows/ci.yml](.github/workflows/ci.yml) job `integration-tests`, шаг `Apply migrations`:
+
+```yaml
+go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
+  -dir ./db/migrations \
+  postgres "$GOOSE_DBSTRING" up
+```
+
+**Корень проблемы.** В свежих версиях goose v3 driver и DSN передаются не позиционно, а через переменные окружения `GOOSE_DRIVER`/`GOOSE_DBSTRING` (они уже выставлены в окружении job-а). После этого команда становится `goose -dir <path> up`, без слова `postgres` и без явного DSN. Старый синтаксис `goose ... postgres "dsn" up` отпал, отсюда `"postgres": no such command`.
+
+**Что сделать:**
+- В CI поменять команду на `goose -dir ./db/migrations up` (driver+DSN уже в env);
+- Аналогично пройтись по таргетам `db:up`/`db:down`/`db:status` в [Taskfile.yml](Taskfile.yml) — там тоже передаём DSN позиционно (`goose ... postgres '<dsn>' up`), что сломается на той же версии. Перевести на env-mode и убрать позиционные аргументы;
+- В Dockerfile (target `migrate`) ENTRYPOINT уже использует позиционный DSN — переписать на env-вариант, чтобы compose `task-service-migrate` сервис продолжал работать.
+- Зафиксировать версию goose в одном месте (например, vars `GOOSE_VERSION` в Taskfile уже есть — её и тиражировать в CI и Dockerfile).
+
+**Проверка:** `task deploy:test` + `task integration-tests` локально должны проходить без падения миграций; CI `integration-tests` job — зелёный.
+
+---
+
 ## Roadmap фич
 
-### 4. Пагинация для `GET /tasks` (`limit` / `offset` / `cursor`)
+### 5. Пагинация для `GET /tasks` (`limit` / `offset` / `cursor`)
 
 **Что:** добавить query-параметры `?limit=N&offset=M` (страничная навигация) или `?cursor=ID` (курсорная) для list-эндпоинта.
 
@@ -110,7 +140,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 5. Валидация входных DTO через `go-playground/validator`
+### 6. Валидация входных DTO через `go-playground/validator`
 
 **Что:** заменить ручную проверку в `CreateTask` на тэги + единую функцию валидации.
 
@@ -124,7 +154,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 6. Метрики Prometheus (`/metrics`)
+### 7. Метрики Prometheus (`/metrics`)
 
 **Что:** инструментация HTTP и БД, выкладывание `/metrics` эндпоинта.
 
@@ -137,7 +167,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 7. Distributed tracing (OpenTelemetry)
+### 8. Distributed tracing (OpenTelemetry)
 
 **Что:** трассировка запросов через OTEL SDK с экспортом в Jaeger/Tempo.
 
@@ -151,7 +181,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 8. Аутентификация (JWT / API token)
+### 9. Аутентификация (JWT / API token)
 
 **Что:** middleware проверки токена; неавторизованные запросы → 401.
 
@@ -165,7 +195,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 9. PATCH / DELETE для задач
+### 10. PATCH / DELETE для задач
 
 **Что:** добавить ручки `PATCH /tasks/{id}` и `DELETE /tasks/{id}`.
 
@@ -190,7 +220,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 10. Лимит размера тела запроса и rate limiting
+### 11. Лимит размера тела запроса и rate limiting
 
 **Размер тела:**
 - В `internal/server/task.go` — `r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)` перед `io.ReadAll`.
