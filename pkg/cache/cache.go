@@ -151,7 +151,7 @@ func (c *Cache[K, V]) Cleanup() {
 	c.snapshotMu.Lock()
 	defer c.snapshotMu.Unlock()
 
-	toRemove := int(c.len.Load() / 5) // drop the oldest 20% of cached records
+	toRemove := c.len.Load() / 5 // drop the oldest 20% of cached records
 	if toRemove == 0 {
 		return
 	}
@@ -169,15 +169,15 @@ func (c *Cache[K, V]) Cleanup() {
 	}
 	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 
-	if toRemove > len(keys) {
-		toRemove = len(keys)
+	if toRemove > uint64(len(keys)) {
+		toRemove = uint64(len(keys))
 	}
-	for i := 0; i < toRemove; i++ {
+	for i := uint64(0); i < toRemove; i++ {
 		c.items.Delete(keys[i])
 		c.len.Add(^uint64(0)) // atomic decrement
 	}
 
-	if toRemove < len(keys) {
+	if toRemove < uint64(len(keys)) {
 		c.firstKey.Store(uint64(keys[toRemove]))
 	} else {
 		c.firstKey.Store(0)
