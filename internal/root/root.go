@@ -3,7 +3,7 @@ package root
 import (
 	"context"
 	"sync"
-	
+
 	"task-service/internal/config"
 	"task-service/internal/ports"
 	"task-service/pkg/logging"
@@ -20,7 +20,7 @@ type Root struct {
 	repositories struct {
 		taskRepository ports.TaskRepository
 	}
-	
+
 	backgroundJobs []func() error
 	stopHandlers   []func()
 }
@@ -30,27 +30,27 @@ func New(ctx context.Context, config *config.Config, logger *logging.Logger) (*R
 		ctx:    ctx,
 		config: config,
 	}
-	
+
 	root.initObservability(logger)
-	
+
 	if err := root.initRepositories(); err != nil {
 		return nil, err
 	}
-	
+
 	if err := root.initServices(); err != nil {
 		return nil, err
 	}
-	
+
 	root.initHTTPServer()
-	
+
 	return &root, nil
 }
 
 func (r *Root) Run() error {
 	defer r.stop()
-	
+
 	errors := r.startBackgroundJobs()
-	
+
 	select {
 	case <-r.ctx.Done():
 		r.logger.Warn("stopping application, context was cancelled")
@@ -70,13 +70,13 @@ func (r *Root) RegisterStopHandler(stopHandler func()) {
 
 func (r *Root) startBackgroundJobs() chan error {
 	errors := make(chan error, len(r.backgroundJobs))
-	
+
 	for _, job := range r.backgroundJobs {
 		go func() {
 			errors <- job()
 		}()
 	}
-	
+
 	return errors
 }
 
