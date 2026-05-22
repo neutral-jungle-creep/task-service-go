@@ -53,7 +53,7 @@ func (s *TaskService) List() ([]*domain.Task, error) {
 	s.logger.AsyncDebug(fmt.Sprintf("list %d tasks from cache", len(tasksFromCache)))
 
 	tasksFromDb, err := s.repository.List(&ports.ListTasksFilter{
-		ToID: firstTaskKey, // ask the repository for all ids less than firstTaskKey
+		ToID: firstTaskKey,
 	})
 	if err != nil {
 		s.logger.AsyncError("failed to list tasks", err)
@@ -61,9 +61,7 @@ func (s *TaskService) List() ([]*domain.Task, error) {
 	}
 	s.logger.AsyncDebug(fmt.Sprintf("list %d tasks from repository", len(tasksFromDb)))
 
-	// Cache cleanup may have moved firstKey forward between the cache snapshot
-	// and the repository query, so rows in the overlapping range can appear in
-	// both lists. Dedupe by id, preferring the (fresher) cache copy.
+	// Dedupe by id in case cleanup moved firstKey forward after the snapshot.
 	seen := make(map[uint64]struct{}, len(tasksFromCache))
 	for _, t := range tasksFromCache {
 		seen[t.ID] = struct{}{}

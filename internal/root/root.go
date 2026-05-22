@@ -1,96 +1,93 @@
 package root
 
 import (
-	"context"
-	"sync"
-
-	"task-service/internal/config"
-	"task-service/internal/ports"
-	"task-service/pkg/logging"
+    "context"
+    "sync"
+    
+    "task-service/internal/config"
+    "task-service/internal/ports"
+    "task-service/pkg/logging"
 )
 
 type Root struct {
-	ctx      context.Context
-	config   *config.Config
-	logger   *logging.AsyncLogger
-	services struct {
-		taskService ports.TaskService
-		taskCache   ports.TaskCache
-	}
-	repositories struct {
-		taskRepository ports.TaskRepository
-	}
-
-	backgroundJobs []func() error
-	stopHandlers   []func()
+    ctx      context.Context
+    config   *config.Config
+    logger   *logging.AsyncLogger
+    services struct {
+        taskService ports.TaskService
+        taskCache   ports.TaskCache
+    }
+    repositories struct {
+        taskRepository ports.TaskRepository
+    }
+    
+    backgroundJobs []func() error
+    stopHandlers   []func()
 }
 
 func New(ctx context.Context, config *config.Config, logger *logging.Logger) (*Root, error) {
-	root := Root{
-		ctx:    ctx,
-		config: config,
-	}
-
-	root.initObservability(logger)
-
-	if err := root.initRepositories(); err != nil {
-		return nil, err
-	}
-
-	if err := root.initServices(); err != nil {
-		return nil, err
-	}
-
-	root.initHTTPServer()
-
-	return &root, nil
+    root := Root{
+        ctx:    ctx,
+        config: config,
+    }
+    
+    root.initObservability(logger)
+    
+    if err := root.initRepositories(); err != nil {
+        return nil, err
+    }
+    
+    if err := root.initServices(); err != nil {
+        return nil, err
+    }
+    
+    root.initHTTPServer()
+    
+    return &root, nil
 }
 
 func (r *Root) Run() error {
-	defer r.stop()
-
-	errors := r.startBackgroundJobs()
-
-	select {
-	case <-r.ctx.Done():
-		r.logger.Warn("stopping application, context was cancelled")
-		return nil
-	case err := <-errors:
-		return err
-	}
+    defer r.stop()
+    
+    errors := r.startBackgroundJobs()
+    
+    select {
+    case <-r.ctx.Done():
+        r.logger.Warn("stopping application, context was cancelled")
+        return nil
+    case err := <-errors:
+        return err
+    }
 }
 
 func (r *Root) RegisterBackgroundJob(backgroundJob func() error) {
-	r.backgroundJobs = append(r.backgroundJobs, backgroundJob)
+    r.backgroundJobs = append(r.backgroundJobs, backgroundJob)
 }
 
 func (r *Root) RegisterStopHandler(stopHandler func()) {
-	r.stopHandlers = append(r.stopHandlers, stopHandler)
+    r.stopHandlers = append(r.stopHandlers, stopHandler)
 }
 
 func (r *Root) startBackgroundJobs() chan error {
-	// buffered so every background job can report its error without blocking
-	// once Run has already returned via ctx.Done() — otherwise extra goroutines
-	// would leak waiting on send.
-	errors := make(chan error, len(r.backgroundJobs))
-
-	for _, job := range r.backgroundJobs {
-		go func() {
-			errors <- job()
-		}()
-	}
-
-	return errors
+    errors := make(chan error, len(r.backgroundJobs))
+    
+    for _, job := range r.backgroundJobs {
+        go func() {
+            errors <- job()
+        }()
+    }
+    
+    return errors
 }
 
 func (r *Root) stop() {
-	var wg sync.WaitGroup
-	wg.Add(len(r.stopHandlers))
-	for _, handler := range r.stopHandlers {
-		go func() {
-			defer wg.Done()
-			handler()
-		}()
-	}
-	wg.Wait()
+    var wg sync.WaitGroup
+    wg.Add(len(r.stopHandlers))
+    for _, handler := range r.stopHandlers {
+        go func() {
+            defer wg.Done()
+            handler()
+        }()
+    }
+    wg.Wait()
 }

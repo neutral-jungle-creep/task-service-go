@@ -79,8 +79,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	// Path may exist under a different method — then it is 405.
-	// Otherwise 404.
+	// 405 if the path matches under another method, else 404.
 	for otherMethod, routes := range r.routes {
 		if otherMethod == method {
 			continue

@@ -6,8 +6,6 @@ import (
 	"unsafe"
 )
 
-// ErrTaskNotFound is returned by repositories/services when the requested
-// task does not exist. HTTP handlers translate it to 404.
 var ErrTaskNotFound = errors.New("task not found")
 
 type Task struct {
@@ -43,15 +41,10 @@ const (
 )
 
 func (t *Task) Size() uint64 {
-	// Struct headers (string headers store ptr+len, time.Time is fixed-size).
 	size := uint64(unsafe.Sizeof(*t))
-
-	// String backing arrays — these dominate footprint for non-trivial tasks.
 	size += uint64(len(t.Name))
 	size += uint64(len(t.Body))
 	size += uint64(len(t.Status))
-
-	// UpdatedAt header is already in unsafe.Sizeof(*t); add the time.Time payload it points to.
 	if t.UpdatedAt != nil {
 		size += uint64(unsafe.Sizeof(*t.UpdatedAt))
 	}

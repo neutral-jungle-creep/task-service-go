@@ -14,9 +14,6 @@ const (
 	defaultMemoryMonitorInterval = 5 * time.Second
 )
 
-// TaskCache adapts pkg/cache.Cache[uint64, *domain.Task] to ports.TaskCache
-// and pre-fills itself from the repository on startup so that the most
-// recent records sit in memory immediately.
 type TaskCache struct {
 	inner *cache.Cache[uint64, *domain.Task]
 }
@@ -38,8 +35,6 @@ func NewTaskCache(memoryLimitMB int, memoryMonitorInterval time.Duration, reposi
 	return tc, nil
 }
 
-// Run starts the underlying memory monitor; intended to be registered as a
-// background job by the DI container.
 func (t *TaskCache) Run(ctx context.Context) error {
 	return t.inner.Run(ctx)
 }
@@ -57,15 +52,13 @@ func (t *TaskCache) List() ([]*domain.Task, uint64) {
 }
 
 func (t *TaskCache) fill(repository ports.TaskRepository) error {
-	tasks, err := repository.List(&ports.ListTasksFilter{ // fetch from the newest end so the cache holds the most recent records
+	tasks, err := repository.List(&ports.ListTasksFilter{
 		Sort: ports.SortDesc,
 	})
 	if err != nil {
 		return err
 	}
 
-	// budget is 90% of the cleanup threshold, converted from MB to bytes —
-	// task.Size() returns bytes, so the comparison must be in bytes too.
 	budget := t.inner.CleanupStartMB() * 1024 * 1024 * 9 / 10
 	var totalSize uint64
 	for _, task := range tasks {
