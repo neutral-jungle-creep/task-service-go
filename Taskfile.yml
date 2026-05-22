@@ -173,16 +173,25 @@ tasks:
   # DATABASE / MIGRATIONS (goose)
   # ============================================================================
   db:up:
+    env:
+      GOOSE_DRIVER: '{{.GOOSE_DRIVER}}'
+      GOOSE_DBSTRING: '{{.GOOSE_DBSTRING}}'
     cmds:
-      - go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} {{.GOOSE_DRIVER}} '{{.GOOSE_DBSTRING}}' up
+      - go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} up
 
   db:down:
+    env:
+      GOOSE_DRIVER: '{{.GOOSE_DRIVER}}'
+      GOOSE_DBSTRING: '{{.GOOSE_DBSTRING}}'
     cmds:
-      - go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} {{.GOOSE_DRIVER}} '{{.GOOSE_DBSTRING}}' down
+      - go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} down
 
   db:status:
+    env:
+      GOOSE_DRIVER: '{{.GOOSE_DRIVER}}'
+      GOOSE_DBSTRING: '{{.GOOSE_DBSTRING}}'
     cmds:
-      - go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} {{.GOOSE_DRIVER}} '{{.GOOSE_DBSTRING}}' status
+      - go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} -dir {{.GOOSE_MIGRATION_DIR}} status
 
   db:create:
     cmds:

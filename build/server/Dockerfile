@@ -45,4 +45,4 @@ COPY db/migrations /migrations
 ENV GOOSE_DRIVER=postgres
 ENV GOOSE_MIGRATION_DIR=/migrations
 
-ENTRYPOINT ["sh", "-c", "goose -dir /migrations postgres \"$GOOSE_DBSTRING\" up"]
+ENTRYPOINT ["goose", "-dir", "/migrations", "up"]

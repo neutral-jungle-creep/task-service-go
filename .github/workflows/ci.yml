@@ -110,7 +110,7 @@ jobs:
         run: |
           go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
             -dir ./db/migrations \
-            postgres "$GOOSE_DBSTRING" up
+            up
 
       - name: Run integration tests
         env:
