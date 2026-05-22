@@ -6,17 +6,7 @@
 
 ## Инфраструктура и качество
 
-### 1. README на русском
-
-**Что:** добавить русскоязычную версию README — либо отдельным файлом `README.ru.md` с перекрёстной ссылкой из английского README, либо как второй блок в самом `README.md` под якорем (как было раньше).
-
-**Зачем:** часть команды читает по-русски; снизит порог входа для onboarding.
-
-**Объём:** перевод существующего англоязычного `README.md`. Все таблицы/команды/пути остаются как есть, переводится только текст.
-
----
-
-### 2. `BackgroundRegistrar` в `pkg/background`
+### 1. `BackgroundRegistrar` в `pkg/background`
 
 **Что:** вынести логику `startBackgroundJobs` + `stop` из `internal/root/root.go` в переиспользуемый пакет `pkg/background`.
 
@@ -56,7 +46,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 3. Улучшить покрытие тестами
+### 2. Улучшить покрытие тестами
 
 **Текущий замер (CI прогон):**
 
@@ -93,7 +83,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 4. Разобраться с миграциями goose в CI
+### 3. Разобраться с миграциями goose в CI
 
 **Что:** integration-tests job в CI падает на накатывании миграций:
 
@@ -125,7 +115,7 @@ go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
 
 ## Roadmap фич
 
-### 5. Пагинация для `GET /tasks` (`limit` / `offset` / `cursor`)
+### 4. Пагинация для `GET /tasks` (`limit` / `offset` / `cursor`)
 
 **Что:** добавить query-параметры `?limit=N&offset=M` (страничная навигация) или `?cursor=ID` (курсорная) для list-эндпоинта.
 
@@ -140,7 +130,7 @@ go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
 
 ---
 
-### 6. Валидация входных DTO через `go-playground/validator`
+### 5. Валидация входных DTO через `go-playground/validator`
 
 **Что:** заменить ручную проверку в `CreateTask` на тэги + единую функцию валидации.
 
@@ -154,7 +144,7 @@ go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
 
 ---
 
-### 7. Метрики Prometheus (`/metrics`)
+### 6. Метрики Prometheus (`/metrics`)
 
 **Что:** инструментация HTTP и БД, выкладывание `/metrics` эндпоинта.
 
@@ -167,7 +157,7 @@ go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
 
 ---
 
-### 8. Distributed tracing (OpenTelemetry)
+### 7. Distributed tracing (OpenTelemetry)
 
 **Что:** трассировка запросов через OTEL SDK с экспортом в Jaeger/Tempo.
 
@@ -181,7 +171,7 @@ go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
 
 ---
 
-### 9. Аутентификация (JWT / API token)
+### 8. Аутентификация (JWT / API token)
 
 **Что:** middleware проверки токена; неавторизованные запросы → 401.
 
@@ -195,7 +185,7 @@ go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
 
 ---
 
-### 10. PATCH / DELETE для задач
+### 9. PATCH / DELETE для задач
 
 **Что:** добавить ручки `PATCH /tasks/{id}` и `DELETE /tasks/{id}`.
 
@@ -220,7 +210,7 @@ go run github.com/pressly/goose/v3/cmd/goose@v3.22.1 \
 
 ---
 
-### 11. Лимит размера тела запроса и rate limiting
+### 10. Лимит размера тела запроса и rate limiting
 
 **Размер тела:**
 - В `internal/server/task.go` — `r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)` перед `io.ReadAll`.
