@@ -44,36 +44,27 @@ func (s *TaskService) Create(task *domain.Task) (uint64, error) {
 	return id, nil
 }
 
-func (s *TaskService) List() ([]*domain.Task, error) {
-	tasksFromCache, firstTaskKey := s.cache.List()
-	if firstTaskKey == 1 {
-		s.logger.AsyncDebug("all tasks in cache")
-		return tasksFromCache, nil
+func (s *TaskService) List(limit, offset uint64) ([]*domain.Task, uint64, error) {
+	filter := &ports.ListTasksFilter{
+		Sort:   ports.SortAsc,
+		Limit:  limit,
+		Offset: offset,
 	}
-	s.logger.AsyncDebug(fmt.Sprintf("list %d tasks from cache", len(tasksFromCache)))
 
-	tasksFromDb, err := s.repository.List(&ports.ListTasksFilter{
-		ToID: firstTaskKey,
-	})
+	total, err := s.repository.Count(filter)
+	if err != nil {
+		s.logger.AsyncError("failed to count tasks", err)
+		return nil, 0, err
+	}
+
+	tasks, err := s.repository.List(filter)
 	if err != nil {
 		s.logger.AsyncError("failed to list tasks", err)
-		return nil, err
+		return nil, 0, err
 	}
-	s.logger.AsyncDebug(fmt.Sprintf("list %d tasks from repository", len(tasksFromDb)))
+	s.logger.AsyncDebug(fmt.Sprintf("listed %d tasks (total %d, limit=%d offset=%d)", len(tasks), total, limit, offset))
 
-	// Dedupe by id in case cleanup moved firstKey forward after the snapshot.
-	seen := make(map[uint64]struct{}, len(tasksFromCache))
-	for _, t := range tasksFromCache {
-		seen[t.ID] = struct{}{}
-	}
-	merged := make([]*domain.Task, 0, len(tasksFromDb)+len(tasksFromCache))
-	for _, t := range tasksFromDb {
-		if _, dup := seen[t.ID]; !dup {
-			merged = append(merged, t)
-		}
-	}
-	merged = append(merged, tasksFromCache...)
-	return merged, nil
+	return tasks, total, nil
 }
 
 func (s *TaskService) Get(id uint64) (*domain.Task, error) {

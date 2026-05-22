@@ -132,7 +132,7 @@ func TestTaskRepository_List_NoFilter_ASC(t *testing.T) {
 		AddRow(int64(2), "b", "bb", "COMPLETE", time.Now(), nil)
 
 	mock.ExpectQuery(`SELECT .* FROM tasks\s+ORDER BY id ASC\s+LIMIT \$1`).
-		WithArgs(1000).
+		WithArgs(uint64(1000), uint64(0)).
 		WillReturnRows(rows)
 
 	tasks, err := repo.List(nil)
@@ -151,7 +151,7 @@ func TestTaskRepository_List_Desc(t *testing.T) {
 	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"})
 
 	mock.ExpectQuery(`SELECT .* FROM tasks\s+ORDER BY id DESC\s+LIMIT \$1`).
-		WithArgs(1000).
+		WithArgs(uint64(1000), uint64(0)).
 		WillReturnRows(rows)
 
 	tasks, err := repo.List(&ports.ListTasksFilter{Sort: ports.SortDesc})
@@ -169,7 +169,7 @@ func TestTaskRepository_List_ToID_ASC(t *testing.T) {
 		AddRow(int64(5), "a", "aa", "NEW", time.Now(), nil)
 
 	mock.ExpectQuery(`SELECT .* FROM tasks\s+WHERE id < \$1\s+ORDER BY id ASC\s+LIMIT \$2`).
-		WithArgs(uint64(10), 1000).
+		WithArgs(uint64(10), uint64(1000), uint64(0)).
 		WillReturnRows(rows)
 
 	tasks, err := repo.List(&ports.ListTasksFilter{ToID: 10})
@@ -187,7 +187,7 @@ func TestTaskRepository_List_ToID_Desc(t *testing.T) {
 	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"})
 
 	mock.ExpectQuery(`SELECT .* FROM tasks\s+WHERE id < \$1\s+ORDER BY id DESC\s+LIMIT \$2`).
-		WithArgs(uint64(10), 1000).
+		WithArgs(uint64(10), uint64(1000), uint64(0)).
 		WillReturnRows(rows)
 
 	_, err := repo.List(&ports.ListTasksFilter{Sort: ports.SortDesc, ToID: 10})
@@ -220,13 +220,72 @@ func TestTaskRepository_List_ScanError(t *testing.T) {
 		AddRow("not-a-number", "n", "b", "NEW", time.Now(), nil)
 
 	mock.ExpectQuery(`SELECT .* FROM tasks`).
-		WithArgs(1000).
+		WithArgs(uint64(1000), uint64(0)).
 		WillReturnRows(rows)
 
 	tasks, err := repo.List(nil)
 	require.Error(t, err)
 	assert.Nil(t, tasks)
 	assert.Contains(t, err.Error(), "scan task")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_List_HonoursLimitOffset(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	rows := sqlmock.NewRows([]string{"id", "name", "body", "status", "created_at", "updated_at"})
+
+	mock.ExpectQuery(`SELECT .* FROM tasks\s+ORDER BY id ASC\s+LIMIT \$1 OFFSET \$2`).
+		WithArgs(uint64(25), uint64(50)).
+		WillReturnRows(rows)
+
+	_, err := repo.List(&ports.ListTasksFilter{Limit: 25, Offset: 50})
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Count_NoFilter(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM tasks$`).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(int64(42)))
+
+	total, err := repo.Count(nil)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(42), total)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Count_WithToID(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM tasks WHERE id < \$1`).
+		WithArgs(uint64(10)).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(int64(7)))
+
+	total, err := repo.Count(&ports.ListTasksFilter{ToID: 10})
+	require.NoError(t, err)
+	assert.Equal(t, uint64(7), total)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Count_QueryError(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM tasks`).
+		WillReturnError(errors.New("nope"))
+
+	_, err := repo.Count(nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "count tasks")
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -240,7 +299,7 @@ func TestTaskRepository_List_RowsErr(t *testing.T) {
 		RowError(0, errors.New("row iteration failed"))
 
 	mock.ExpectQuery(`SELECT .* FROM tasks`).
-		WithArgs(1000).
+		WithArgs(uint64(1000), uint64(0)).
 		WillReturnRows(rows)
 
 	tasks, err := repo.List(nil)

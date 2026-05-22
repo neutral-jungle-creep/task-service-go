@@ -8,7 +8,7 @@ type TaskService interface {
 }
 
 type TaskQueries interface {
-	List() ([]*domain.Task, error)
+	List(limit, offset uint64) ([]*domain.Task, uint64, error)
 	Get(id uint64) (*domain.Task, error)
 }
 

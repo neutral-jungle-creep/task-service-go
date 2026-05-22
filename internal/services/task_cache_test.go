@@ -16,8 +16,9 @@ type fakeRepo struct {
 	listFunc func(filter *ports.ListTasksFilter) ([]*domain.Task, error)
 }
 
-func (f *fakeRepo) Store(_ *domain.Task) (uint64, error) { return 0, nil }
-func (f *fakeRepo) Get(_ uint64) (*domain.Task, error)   { return &domain.Task{}, nil }
+func (f *fakeRepo) Store(_ *domain.Task) (uint64, error)           { return 0, nil }
+func (f *fakeRepo) Get(_ uint64) (*domain.Task, error)             { return &domain.Task{}, nil }
+func (f *fakeRepo) Count(_ *ports.ListTasksFilter) (uint64, error) { return 0, nil }
 func (f *fakeRepo) List(filter *ports.ListTasksFilter) ([]*domain.Task, error) {
 	if f.listFunc != nil {
 		return f.listFunc(filter)

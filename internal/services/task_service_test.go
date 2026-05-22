@@ -17,6 +17,7 @@ import (
 type stubRepo struct {
 	storeFunc func(*domain.Task) (uint64, error)
 	listFunc  func(*ports.ListTasksFilter) ([]*domain.Task, error)
+	countFunc func(*ports.ListTasksFilter) (uint64, error)
 	getFunc   func(uint64) (*domain.Task, error)
 }
 
@@ -32,6 +33,13 @@ func (s *stubRepo) List(f *ports.ListTasksFilter) ([]*domain.Task, error) {
 		return s.listFunc(f)
 	}
 	return nil, nil
+}
+
+func (s *stubRepo) Count(f *ports.ListTasksFilter) (uint64, error) {
+	if s.countFunc != nil {
+		return s.countFunc(f)
+	}
+	return 0, nil
 }
 
 func (s *stubRepo) Get(id uint64) (*domain.Task, error) {
@@ -156,46 +164,55 @@ func TestTaskService_Get_FromRepo(t *testing.T) {
 	assert.Equal(t, uint64(11), got.ID)
 }
 
-func TestTaskService_List_AllInCache(t *testing.T) {
+func TestTaskService_List_PassesPaginationToRepo(t *testing.T) {
 	t.Parallel()
 
-	cached := []*domain.Task{{ID: 1}, {ID: 2}}
-	cache := &stubCache{
-		listFunc: func() ([]*domain.Task, uint64) {
-			return cached, 1
-		},
-	}
-
-	svc := services.NewTaskService(newAsyncLogger(t), &stubRepo{}, cache)
-
-	got, err := svc.List()
-	require.NoError(t, err)
-	assert.Equal(t, cached, got)
-}
-
-func TestTaskService_List_MergesRepoAndCache(t *testing.T) {
-	t.Parallel()
-
-	cache := &stubCache{
-		listFunc: func() ([]*domain.Task, uint64) {
-			return []*domain.Task{{ID: 5}, {ID: 6}}, 5
-		},
-	}
 	repo := &stubRepo{
-		listFunc: func(filter *ports.ListTasksFilter) ([]*domain.Task, error) {
-			require.NotNil(t, filter)
-			assert.Equal(t, uint64(5), filter.ToID)
+		listFunc: func(f *ports.ListTasksFilter) ([]*domain.Task, error) {
+			require.NotNil(t, f)
+			assert.Equal(t, uint64(25), f.Limit)
+			assert.Equal(t, uint64(50), f.Offset)
 			return []*domain.Task{{ID: 1}, {ID: 2}}, nil
 		},
+		countFunc: func(f *ports.ListTasksFilter) (uint64, error) {
+			require.NotNil(t, f)
+			return 123, nil
+		},
 	}
 
-	svc := services.NewTaskService(newAsyncLogger(t), repo, cache)
+	svc := services.NewTaskService(newAsyncLogger(t), repo, &stubCache{})
 
-	got, err := svc.List()
+	tasks, total, err := svc.List(25, 50)
 	require.NoError(t, err)
-	require.Len(t, got, 4)
-	assert.Equal(t, uint64(1), got[0].ID)
-	assert.Equal(t, uint64(2), got[1].ID)
-	assert.Equal(t, uint64(5), got[2].ID)
-	assert.Equal(t, uint64(6), got[3].ID)
+	require.Len(t, tasks, 2)
+	assert.Equal(t, uint64(123), total)
+}
+
+func TestTaskService_List_CountError(t *testing.T) {
+	t.Parallel()
+
+	repo := &stubRepo{
+		countFunc: func(*ports.ListTasksFilter) (uint64, error) { return 0, errors.New("count failed") },
+	}
+
+	svc := services.NewTaskService(newAsyncLogger(t), repo, &stubCache{})
+
+	_, _, err := svc.List(10, 0)
+	require.Error(t, err)
+}
+
+func TestTaskService_List_ListError(t *testing.T) {
+	t.Parallel()
+
+	repo := &stubRepo{
+		countFunc: func(*ports.ListTasksFilter) (uint64, error) { return 5, nil },
+		listFunc: func(*ports.ListTasksFilter) ([]*domain.Task, error) {
+			return nil, errors.New("list failed")
+		},
+	}
+
+	svc := services.NewTaskService(newAsyncLogger(t), repo, &stubCache{})
+
+	_, _, err := svc.List(10, 0)
+	require.Error(t, err)
 }

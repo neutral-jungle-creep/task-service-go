@@ -3,8 +3,10 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"task-service/internal/domain"
@@ -17,28 +19,71 @@ const (
 	readRequestBodyError      = "failed to read request body"
 	incorrectRequestBodyError = "incorrect request body"
 	internalServerError       = "internal server error"
+
+	defaultListLimit = 50
+	maxListLimit     = 500
 )
 
-// ListTasks returns all tasks currently known to the service.
+// ListTasks returns a paginated page of tasks plus the total row count.
 //
-//	@Summary	List tasks
+//	@Summary	List tasks (paginated)
 //	@Tags		tasks
 //	@Produce	json
-//	@Success	200	{object}	dto.ListTasksResponse
-//	@Failure	500	{object}	protocol.ExceptionResponse
+//	@Param		limit	query		integer	false	"Items per page (default 50, max 500)"
+//	@Param		offset	query		integer	false	"Items to skip (default 0)"
+//	@Success	200		{object}	dto.ListTasksResponse
+//	@Failure	400		{object}	protocol.ExceptionResponse
+//	@Failure	500		{object}	protocol.ExceptionResponse
 //	@Router		/tasks [get]
-func (api *API) ListTasks(w http.ResponseWriter, _ *http.Request) {
-	tasks, err := api.taskService.List()
+func (api *API) ListTasks(w http.ResponseWriter, r *http.Request) {
+	limit, offset, err := parsePagination(r.URL.Query())
+	if err != nil {
+		protocol.SendErrorResponse(w, http.StatusBadRequest, incorrectRequestBodyError, err)
+		return
+	}
+
+	tasks, total, err := api.taskService.List(limit, offset)
 	if err != nil {
 		protocol.SendErrorResponse(w, http.StatusInternalServerError, internalServerError, err)
 		return
 	}
 
 	response := dto.ListTasksResponse{
-		Items: tasksFromDomain(tasks),
-		Total: uint64(len(tasks)), // once pagination is added this value will come from a repository total method
+		Items:  tasksFromDomain(tasks),
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
 	}
 	protocol.SendSuccessResponse(w, http.StatusOK, response)
+}
+
+// parsePagination reads ?limit=N&offset=M with the rules:
+//   - missing → defaults (50, 0);
+//   - non-numeric or negative → 400;
+//   - limit > maxListLimit → 400.
+func parsePagination(q url.Values) (limit, offset uint64, err error) {
+	limit = defaultListLimit
+	if raw := q.Get("limit"); raw != "" {
+		v, parseErr := strconv.ParseUint(raw, 10, 64)
+		if parseErr != nil {
+			return 0, 0, errors.New("limit must be a non-negative integer")
+		}
+		if v == 0 {
+			return 0, 0, errors.New("limit must be > 0")
+		}
+		if v > maxListLimit {
+			return 0, 0, fmt.Errorf("limit must be <= %d", maxListLimit)
+		}
+		limit = v
+	}
+	if raw := q.Get("offset"); raw != "" {
+		v, parseErr := strconv.ParseUint(raw, 10, 64)
+		if parseErr != nil {
+			return 0, 0, errors.New("offset must be a non-negative integer")
+		}
+		offset = v
+	}
+	return limit, offset, nil
 }
 
 // GetTask returns a single task by id.
