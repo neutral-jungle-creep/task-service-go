@@ -80,14 +80,14 @@ const (
 SELECT id, name, body, status, created_at, updated_at
 FROM tasks
 ORDER BY id ASC
-LIMIT $1
+LIMIT $1 OFFSET $2
 `
 
 	queryListTasksDesc = `
 SELECT id, name, body, status, created_at, updated_at
 FROM tasks
 ORDER BY id DESC
-LIMIT $1
+LIMIT $1 OFFSET $2
 `
 
 	queryListTasksToIDAsc = `
@@ -95,7 +95,7 @@ SELECT id, name, body, status, created_at, updated_at
 FROM tasks
 WHERE id < $1
 ORDER BY id ASC
-LIMIT $2
+LIMIT $2 OFFSET $3
 `
 
 	queryListTasksToIDDesc = `
@@ -103,7 +103,7 @@ SELECT id, name, body, status, created_at, updated_at
 FROM tasks
 WHERE id < $1
 ORDER BY id DESC
-LIMIT $2
+LIMIT $2 OFFSET $3
 `
 )
 
@@ -139,14 +139,47 @@ func buildListQuery(filter *ports.ListTasksFilter) (string, []any) {
 	desc := filter != nil && filter.Sort == ports.SortDesc
 	hasToID := filter != nil && filter.ToID > 0
 
+	limit := uint64(defaultListLimit)
+	if filter != nil && filter.Limit > 0 {
+		limit = filter.Limit
+	}
+	var offset uint64
+	if filter != nil {
+		offset = filter.Offset
+	}
+
 	switch {
 	case hasToID && desc:
-		return queryListTasksToIDDesc, []any{filter.ToID, defaultListLimit}
+		return queryListTasksToIDDesc, []any{filter.ToID, limit, offset}
 	case hasToID:
-		return queryListTasksToIDAsc, []any{filter.ToID, defaultListLimit}
+		return queryListTasksToIDAsc, []any{filter.ToID, limit, offset}
 	case desc:
-		return queryListTasksDesc, []any{defaultListLimit}
+		return queryListTasksDesc, []any{limit, offset}
 	default:
-		return queryListTasksAsc, []any{defaultListLimit}
+		return queryListTasksAsc, []any{limit, offset}
 	}
+}
+
+const (
+	queryCountTasks     = `SELECT COUNT(*) FROM tasks`
+	queryCountTasksToID = `SELECT COUNT(*) FROM tasks WHERE id < $1`
+)
+
+func (r *TaskRepository) Count(filter *ports.ListTasksFilter) (uint64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+	defer cancel()
+
+	var (
+		row   *sql.Row
+		total uint64
+	)
+	if filter != nil && filter.ToID > 0 {
+		row = r.db.QueryRowContext(ctx, queryCountTasksToID, filter.ToID)
+	} else {
+		row = r.db.QueryRowContext(ctx, queryCountTasks)
+	}
+	if err := row.Scan(&total); err != nil {
+		return 0, fmt.Errorf("count tasks: %w", err)
+	}
+	return total, nil
 }

@@ -3,8 +3,10 @@ package dto
 import "time"
 
 type ListTasksResponse struct {
-	Items []*GetTaskResponse `json:"items"`
-	Total uint64             `json:"total"`
+	Items  []*GetTaskResponse `json:"items"`
+	Total  uint64             `json:"total"`
+	Limit  uint64             `json:"limit"`
+	Offset uint64             `json:"offset"`
 }
 
 type GetTaskResponse struct {
