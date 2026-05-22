@@ -69,7 +69,19 @@ func newAsyncLogger(t *testing.T) *logging.AsyncLogger {
 	t.Helper()
 	core, err := logging.NewLogger("error", "test", "test")
 	require.NoError(t, err)
-	return logging.NewAsyncLogger(context.Background(), core)
+
+	async := logging.NewAsyncLogger(context.Background(), core)
+
+	done := make(chan struct{})
+	go func() {
+		_ = async.Process()
+		close(done)
+	}()
+	t.Cleanup(func() {
+		async.Stop()
+		<-done
+	})
+	return async
 }
 
 func TestTaskService_Create(t *testing.T) {
