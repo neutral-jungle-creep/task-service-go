@@ -33,7 +33,7 @@ tasks:
       - task: tidy
       - task: fmt
       - task: lint
-      - task: tests
+      - task: tests:coverage
       - task: build
 
   # ============================================================================
