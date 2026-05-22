@@ -66,10 +66,10 @@ func parsePagination(q url.Values) (limit, offset uint64, err error) {
 	if raw := q.Get("limit"); raw != "" {
 		v, parseErr := strconv.ParseUint(raw, 10, 64)
 		if parseErr != nil {
-			return 0, 0, fmt.Errorf("limit must be a non-negative integer")
+			return 0, 0, errors.New("limit must be a non-negative integer")
 		}
 		if v == 0 {
-			return 0, 0, fmt.Errorf("limit must be > 0")
+			return 0, 0, errors.New("limit must be > 0")
 		}
 		if v > maxListLimit {
 			return 0, 0, fmt.Errorf("limit must be <= %d", maxListLimit)
@@ -79,7 +79,7 @@ func parsePagination(q url.Values) (limit, offset uint64, err error) {
 	if raw := q.Get("offset"); raw != "" {
 		v, parseErr := strconv.ParseUint(raw, 10, 64)
 		if parseErr != nil {
-			return 0, 0, fmt.Errorf("offset must be a non-negative integer")
+			return 0, 0, errors.New("offset must be a non-negative integer")
 		}
 		offset = v
 	}

@@ -173,6 +173,7 @@ func TestApi_ListTasks_BadLimit(t *testing.T) {
 	}
 	for name, raw := range cases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet,
 				routeGroup+"/tasks?limit="+raw, http.NoBody)
 			rec := httptest.NewRecorder()
