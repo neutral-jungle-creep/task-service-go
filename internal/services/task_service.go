@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"task-service/internal/domain"
 	"task-service/internal/ports"
@@ -86,4 +87,63 @@ func (s *TaskService) Get(id uint64) (*domain.Task, error) {
 	s.logger.AsyncDebug(fmt.Sprintf("found task %d from repository", task.ID))
 
 	return task, nil
+}
+
+func (s *TaskService) Update(id uint64, params ports.UpdateTaskParams) (*domain.Task, error) {
+	task, err := s.repository.Get(id)
+	if err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			return nil, err
+		}
+		s.logger.AsyncError("failed to load task for update", err)
+		return nil, err
+	}
+
+	if params.Name != nil {
+		task.Name = *params.Name
+	}
+	if params.Body != nil {
+		task.Body = *params.Body
+	}
+	if params.Status != nil {
+		next := domain.TaskStatus(*params.Status)
+		if !next.IsValid() {
+			return nil, domain.ErrUnknownStatus
+		}
+		if !task.Status.CanTransitionTo(next) {
+			return nil, domain.ErrInvalidStatusTransition
+		}
+		task.Status = next
+	}
+
+	now := time.Now()
+	task.UpdatedAt = &now
+
+	err = s.repository.Update(task)
+	if err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			s.cache.Delete(id)
+			return nil, err
+		}
+		s.logger.AsyncError("failed to update task", err)
+		return nil, err
+	}
+	s.cache.Store(task)
+	s.logger.AsyncDebug(fmt.Sprintf("updated task %d", id))
+	return task, nil
+}
+
+func (s *TaskService) Delete(id uint64) error {
+	err := s.repository.Delete(id)
+	if err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			s.cache.Delete(id)
+			return err
+		}
+		s.logger.AsyncError("failed to delete task", err)
+		return err
+	}
+	s.cache.Delete(id)
+	s.logger.AsyncDebug(fmt.Sprintf("deleted task %d", id))
+	return nil
 }
