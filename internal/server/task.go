@@ -8,6 +8,7 @@ import (
 
 	"task-service/internal/domain"
 	"task-service/internal/server/dto"
+	_ "task-service/pkg/http/protocol" // For gwn swagger documentation
 	"task-service/pkg/http/server"
 )
 

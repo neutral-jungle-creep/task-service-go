@@ -3,8 +3,12 @@ definitions:
   task-service_internal_server_dto.CreateTaskRequest:
     properties:
       body:
+        maxLength: 10000
+        minLength: 1
         type: string
       name:
+        maxLength: 255
+        minLength: 1
         type: string
     required:
     - body
@@ -36,6 +40,10 @@ definitions:
         items:
           $ref: '#/definitions/task-service_internal_server_dto.GetTaskResponse'
         type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
       total:
         type: integer
     type: object
@@ -62,6 +70,15 @@ info:
 paths:
   /tasks:
     get:
+      parameters:
+      - description: Items per page (default 50, max 500)
+        in: query
+        name: limit
+        type: integer
+      - description: Items to skip (default 0)
+        in: query
+        name: offset
+        type: integer
       produces:
       - application/json
       responses:
@@ -69,11 +86,15 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/task-service_internal_server_dto.ListTasksResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/task-service_pkg_http_protocol.ExceptionResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/task-service_pkg_http_protocol.ExceptionResponse'
-      summary: List tasks
+      summary: List tasks (paginated)
       tags:
       - tasks
     post:

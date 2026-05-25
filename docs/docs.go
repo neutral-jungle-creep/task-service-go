@@ -30,12 +30,32 @@ const docTemplate = `{
                 "tags": [
                     "tasks"
                 ],
-                "summary": "List tasks",
+                "summary": "List tasks (paginated)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 50, max 500)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items to skip (default 0)",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/task-service_internal_server_dto.ListTasksResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/task-service_pkg_http_protocol.ExceptionResponse"
                         }
                     },
                     "500": {
@@ -146,10 +166,14 @@ const docTemplate = `{
             ],
             "properties": {
                 "body": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 10000,
+                    "minLength": 1
                 },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 255,
+                    "minLength": 1
                 }
             }
         },
@@ -192,6 +216,12 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/task-service_internal_server_dto.GetTaskResponse"
                     }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
                 },
                 "total": {
                     "type": "integer"
