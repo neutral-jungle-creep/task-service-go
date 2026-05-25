@@ -20,4 +20,6 @@ type UpdateTaskParams struct {
 
 type TaskCommands interface {
 	Create(task *domain.Task) (uint64, error)
+	Update(id uint64, params UpdateTaskParams) (*domain.Task, error)
+	Delete(id uint64) error
 }
