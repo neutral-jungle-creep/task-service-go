@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"task-service/internal/domain"
+	"task-service/internal/ports"
 	"task-service/internal/server"
 	"task-service/internal/server/dto"
 	"task-service/pkg/http/protocol"
@@ -27,6 +28,8 @@ type stubService struct {
 	createFunc func(*domain.Task) (uint64, error)
 	listFunc   func(limit, offset uint64) ([]*domain.Task, uint64, error)
 	getFunc    func(uint64) (*domain.Task, error)
+	updateFunc func(uint64, ports.UpdateTaskParams) (*domain.Task, error)
+	deleteFunc func(uint64) error
 }
 
 func (s *stubService) Create(t *domain.Task) (uint64, error) {
@@ -48,6 +51,20 @@ func (s *stubService) Get(id uint64) (*domain.Task, error) {
 		return s.getFunc(id)
 	}
 	return &domain.Task{}, nil
+}
+
+func (s *stubService) Update(id uint64, f ports.UpdateTaskParams) (*domain.Task, error) {
+	if s.updateFunc != nil {
+		return s.updateFunc(id, f)
+	}
+	return &domain.Task{}, nil
+}
+
+func (s *stubService) Delete(id uint64) error {
+	if s.deleteFunc != nil {
+		return s.deleteFunc(id)
+	}
+	return nil
 }
 
 const routeGroup = "/api/v1/task-service"
@@ -321,4 +338,133 @@ func TestApi_GetTask_BadID(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	assert.False(t, getCalled, "service.Get must not be called when id parsing fails")
+}
+
+func TestApi_UpdateTask_OK(t *testing.T) {
+	t.Parallel()
+
+	svc := &stubService{
+		updateFunc: func(id uint64, f ports.UpdateTaskParams) (*domain.Task, error) {
+			require.NotNil(t, f.Name)
+			assert.Equal(t, "renamed", *f.Name)
+			require.NotNil(t, f.Status)
+			assert.Equal(t, string(domain.TaskStatusInProcess), *f.Status)
+			return &domain.Task{ID: id, Name: *f.Name, Status: domain.TaskStatus(*f.Status)}, nil
+		},
+	}
+
+	req := httptest.NewRequestWithContext(
+		context.Background(),
+		http.MethodPatch,
+		routeGroup+"/tasks/7",
+		strings.NewReader(`{"name":"renamed","status":"IN_PROCESS"}`),
+	)
+	rec := httptest.NewRecorder()
+	newTestServer(t, svc).ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var resp dto.GetTaskResponse
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
+	assert.Equal(t, uint64(7), resp.ID)
+	assert.Equal(t, "renamed", resp.Name)
+	assert.Equal(t, "IN_PROCESS", resp.Status)
+}
+
+func TestApi_UpdateTask_NotFound(t *testing.T) {
+	t.Parallel()
+
+	svc := &stubService{
+		updateFunc: func(uint64, ports.UpdateTaskParams) (*domain.Task, error) {
+			return nil, domain.ErrTaskNotFound
+		},
+	}
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPatch,
+		routeGroup+"/tasks/999", strings.NewReader(`{"name":"x"}`))
+	rec := httptest.NewRecorder()
+	newTestServer(t, svc).ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestApi_UpdateTask_InvalidTransition(t *testing.T) {
+	t.Parallel()
+
+	svc := &stubService{
+		updateFunc: func(uint64, ports.UpdateTaskParams) (*domain.Task, error) {
+			return nil, domain.ErrInvalidStatusTransition
+		},
+	}
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPatch,
+		routeGroup+"/tasks/1", strings.NewReader(`{"status":"NEW"}`))
+	rec := httptest.NewRecorder()
+	newTestServer(t, svc).ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestApi_UpdateTask_BadStatusEnum(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPatch,
+		routeGroup+"/tasks/1", strings.NewReader(`{"status":"BOGUS"}`))
+	rec := httptest.NewRecorder()
+	newTestServer(t, &stubService{}).ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code, "validator must reject unknown status")
+}
+
+func TestApi_UpdateTask_BadJSON(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPatch,
+		routeGroup+"/tasks/1", strings.NewReader(`not-json`))
+	rec := httptest.NewRecorder()
+	newTestServer(t, &stubService{}).ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestApi_UpdateTask_BadID(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPatch,
+		routeGroup+"/tasks/not-a-number", strings.NewReader(`{"name":"x"}`))
+	rec := httptest.NewRecorder()
+	newTestServer(t, &stubService{}).ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestApi_DeleteTask_OK(t *testing.T) {
+	t.Parallel()
+
+	deletedID := uint64(0)
+	svc := &stubService{
+		deleteFunc: func(id uint64) error { deletedID = id; return nil },
+	}
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete,
+		routeGroup+"/tasks/42", http.NoBody)
+	rec := httptest.NewRecorder()
+	newTestServer(t, svc).ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+	assert.Equal(t, uint64(42), deletedID)
+}
+
+func TestApi_DeleteTask_NotFound(t *testing.T) {
+	t.Parallel()
+
+	svc := &stubService{
+		deleteFunc: func(uint64) error { return domain.ErrTaskNotFound },
+	}
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete,
+		routeGroup+"/tasks/999", http.NoBody)
+	rec := httptest.NewRecorder()
+	newTestServer(t, svc).ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestApi_DeleteTask_BadID(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete,
+		routeGroup+"/tasks/not-a-number", http.NoBody)
+	rec := httptest.NewRecorder()
+	newTestServer(t, &stubService{}).ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }

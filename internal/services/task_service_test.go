@@ -15,10 +15,26 @@ import (
 )
 
 type stubRepo struct {
-	storeFunc func(*domain.Task) (uint64, error)
-	listFunc  func(*ports.ListTasksFilter) ([]*domain.Task, error)
-	countFunc func(*ports.ListTasksFilter) (uint64, error)
-	getFunc   func(uint64) (*domain.Task, error)
+	storeFunc  func(*domain.Task) (uint64, error)
+	listFunc   func(*ports.ListTasksFilter) ([]*domain.Task, error)
+	countFunc  func(*ports.ListTasksFilter) (uint64, error)
+	getFunc    func(uint64) (*domain.Task, error)
+	updateFunc func(*domain.Task) error
+	deleteFunc func(uint64) error
+}
+
+func (s *stubRepo) Update(t *domain.Task) error {
+	if s.updateFunc != nil {
+		return s.updateFunc(t)
+	}
+	return nil
+}
+
+func (s *stubRepo) Delete(id uint64) error {
+	if s.deleteFunc != nil {
+		return s.deleteFunc(id)
+	}
+	return nil
 }
 
 func (s *stubRepo) Store(t *domain.Task) (uint64, error) {
@@ -51,8 +67,13 @@ func (s *stubRepo) Get(id uint64) (*domain.Task, error) {
 
 type stubCache struct {
 	stored   []*domain.Task
+	deleted  []uint64
 	listFunc func() ([]*domain.Task, uint64)
 	getFunc  func(uint64) (*domain.Task, bool)
+}
+
+func (s *stubCache) Delete(id uint64) {
+	s.deleted = append(s.deleted, id)
 }
 
 func (s *stubCache) Store(t *domain.Task) {
@@ -215,4 +236,102 @@ func TestTaskService_List_ListError(t *testing.T) {
 
 	_, _, err := svc.List(10, 0)
 	require.Error(t, err)
+}
+
+func TestTaskService_Update_OK(t *testing.T) {
+	t.Parallel()
+
+	repo := &stubRepo{
+		getFunc: func(id uint64) (*domain.Task, error) {
+			return &domain.Task{ID: id, Name: "old", Body: "old-body", Status: domain.TaskStatusNew}, nil
+		},
+		updateFunc: func(task *domain.Task) error {
+			assert.Equal(t, "new-name", task.Name)
+			assert.Equal(t, domain.TaskStatusInProcess, task.Status)
+			require.NotNil(t, task.UpdatedAt)
+			return nil
+		},
+	}
+	cache := &stubCache{}
+
+	newName := "new-name"
+	newStatus := string(domain.TaskStatusInProcess)
+
+	svc := services.NewTaskService(newAsyncLogger(t), repo, cache)
+	updated, err := svc.Update(1, ports.UpdateTaskParams{
+		Name:   &newName,
+		Status: &newStatus,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "new-name", updated.Name)
+	assert.Equal(t, domain.TaskStatusInProcess, updated.Status)
+	require.Len(t, cache.stored, 1, "updated task must be re-stored in cache")
+}
+
+func TestTaskService_Update_NotFound(t *testing.T) {
+	t.Parallel()
+
+	repo := &stubRepo{
+		getFunc: func(uint64) (*domain.Task, error) { return nil, domain.ErrTaskNotFound },
+	}
+	svc := services.NewTaskService(newAsyncLogger(t), repo, &stubCache{})
+	_, err := svc.Update(1, ports.UpdateTaskParams{})
+	require.ErrorIs(t, err, domain.ErrTaskNotFound)
+}
+
+func TestTaskService_Update_InvalidTransition(t *testing.T) {
+	t.Parallel()
+
+	repo := &stubRepo{
+		getFunc: func(uint64) (*domain.Task, error) {
+			return &domain.Task{Status: domain.TaskStatusComplete}, nil
+		},
+	}
+	svc := services.NewTaskService(newAsyncLogger(t), repo, &stubCache{})
+
+	status := string(domain.TaskStatusInProcess)
+	_, err := svc.Update(1, ports.UpdateTaskParams{Status: &status})
+	require.ErrorIs(t, err, domain.ErrInvalidStatusTransition)
+}
+
+func TestTaskService_Update_UnknownStatus(t *testing.T) {
+	t.Parallel()
+
+	repo := &stubRepo{
+		getFunc: func(uint64) (*domain.Task, error) {
+			return &domain.Task{Status: domain.TaskStatusNew}, nil
+		},
+	}
+	svc := services.NewTaskService(newAsyncLogger(t), repo, &stubCache{})
+
+	bogus := "BOGUS"
+	_, err := svc.Update(1, ports.UpdateTaskParams{Status: &bogus})
+	require.ErrorIs(t, err, domain.ErrUnknownStatus)
+}
+
+func TestTaskService_Delete_OK(t *testing.T) {
+	t.Parallel()
+
+	repo := &stubRepo{
+		deleteFunc: func(uint64) error { return nil },
+	}
+	cache := &stubCache{}
+	svc := services.NewTaskService(newAsyncLogger(t), repo, cache)
+
+	require.NoError(t, svc.Delete(42))
+	assert.Equal(t, []uint64{42}, cache.deleted)
+}
+
+func TestTaskService_Delete_NotFound(t *testing.T) {
+	t.Parallel()
+
+	repo := &stubRepo{
+		deleteFunc: func(uint64) error { return domain.ErrTaskNotFound },
+	}
+	cache := &stubCache{}
+	svc := services.NewTaskService(newAsyncLogger(t), repo, cache)
+
+	err := svc.Delete(99)
+	require.ErrorIs(t, err, domain.ErrTaskNotFound)
+	assert.Equal(t, []uint64{99}, cache.deleted, "cache eviction should still run on not-found")
 }
