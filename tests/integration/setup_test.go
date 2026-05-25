@@ -68,7 +68,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 	async := logging.NewAsyncLogger(ctx, core)
 	go func() { _ = async.Process() }()
 
-	cache, err := services.NewTaskCache(8, time.Hour, repo)
+	cache, err := services.NewTaskCache(ctx, 8, time.Hour, repo)
 	require.NoError(t, err)
 
 	svc := services.NewTaskService(async, repo, cache)

@@ -1,6 +1,7 @@
 package services_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -13,22 +14,26 @@ import (
 )
 
 type fakeRepo struct {
-	listFunc func(filter *ports.ListTasksFilter) ([]*domain.Task, error)
+	listFunc func(ctx context.Context, filter *ports.ListTasksFilter) ([]*domain.Task, error)
 }
 
-func (f *fakeRepo) Store(_ *domain.Task) (uint64, error)           { return 0, nil }
-func (f *fakeRepo) Get(_ uint64) (*domain.Task, error)             { return &domain.Task{}, nil }
-func (f *fakeRepo) Count(_ *ports.ListTasksFilter) (uint64, error) { return 0, nil }
-func (f *fakeRepo) List(filter *ports.ListTasksFilter) ([]*domain.Task, error) {
+func (f *fakeRepo) Store(context.Context, *domain.Task) (uint64, error) { return 0, nil }
+func (f *fakeRepo) Get(context.Context, uint64) (*domain.Task, error)   { return &domain.Task{}, nil }
+func (f *fakeRepo) Count(context.Context, *ports.ListTasksFilter) (uint64, error) {
+	return 0, nil
+}
+func (f *fakeRepo) Update(context.Context, *domain.Task) error { return nil }
+func (f *fakeRepo) Delete(context.Context, uint64) error       { return nil }
+func (f *fakeRepo) List(ctx context.Context, filter *ports.ListTasksFilter) ([]*domain.Task, error) {
 	if f.listFunc != nil {
-		return f.listFunc(filter)
+		return f.listFunc(ctx, filter)
 	}
 	return nil, nil
 }
 
 func newCache(t *testing.T, repo ports.TaskRepository) *services.TaskCache {
 	t.Helper()
-	c, err := services.NewTaskCache(1, time.Hour, repo)
+	c, err := services.NewTaskCache(context.Background(), 1, time.Hour, repo)
 	require.NoError(t, err)
 	return c
 }
@@ -65,7 +70,7 @@ func TestTaskCache_FillFromRepository(t *testing.T) {
 	t.Parallel()
 
 	repo := &fakeRepo{
-		listFunc: func(filter *ports.ListTasksFilter) ([]*domain.Task, error) {
+		listFunc: func(_ context.Context, filter *ports.ListTasksFilter) ([]*domain.Task, error) {
 			require.NotNil(t, filter)
 			assert.Equal(t, ports.SortDesc, filter.Sort)
 			return []*domain.Task{
@@ -75,7 +80,7 @@ func TestTaskCache_FillFromRepository(t *testing.T) {
 		},
 	}
 
-	c, err := services.NewTaskCache(1024, time.Hour, repo)
+	c, err := services.NewTaskCache(context.Background(), 1024, time.Hour, repo)
 	require.NoError(t, err)
 
 	got, ok := c.Get(5)

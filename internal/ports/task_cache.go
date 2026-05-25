@@ -6,4 +6,5 @@ type TaskCache interface {
 	Store(task *domain.Task)
 	List() ([]*domain.Task, uint64)
 	Get(id uint64) (*domain.Task, bool)
+	Delete(id uint64)
 }

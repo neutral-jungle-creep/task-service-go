@@ -6,6 +6,7 @@ import (
 
 func (r *Root) initServices() error {
 	taskCache, err := services.NewTaskCache(
+		r.ctx,
 		r.config.Cache.MemoryCacheLimitMB,
 		r.config.Cache.MemoryMonitorCacheInterval,
 		r.repositories.taskRepository,

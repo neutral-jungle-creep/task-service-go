@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -19,7 +20,7 @@ func TestApi_ListTasks_ConvertsAllFields(t *testing.T) {
 	created := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	svc := &stubService{
-		listFunc: func(uint64, uint64) ([]*domain.Task, uint64, error) {
+		listFunc: func(context.Context, uint64, uint64) ([]*domain.Task, uint64, error) {
 			return []*domain.Task{
 				{
 					ID:        17,

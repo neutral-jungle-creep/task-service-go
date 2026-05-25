@@ -18,7 +18,12 @@ type TaskCache struct {
 	inner *cache.Cache[uint64, *domain.Task]
 }
 
-func NewTaskCache(memoryLimitMB int, memoryMonitorInterval time.Duration, repository ports.TaskRepository) (*TaskCache, error) {
+func NewTaskCache(
+	ctx context.Context,
+	memoryLimitMB int,
+	memoryMonitorInterval time.Duration,
+	repository ports.TaskRepository,
+) (*TaskCache, error) {
 	if memoryLimitMB <= 0 {
 		memoryLimitMB = defaultMemoryUsageMB
 	}
@@ -29,7 +34,7 @@ func NewTaskCache(memoryLimitMB int, memoryMonitorInterval time.Duration, reposi
 	inner := cache.New[uint64, *domain.Task](memoryLimitMB, memoryMonitorInterval)
 	tc := &TaskCache{inner: inner}
 
-	if err := tc.fill(repository); err != nil {
+	if err := tc.fill(ctx, repository); err != nil {
 		return nil, err
 	}
 	return tc, nil
@@ -51,8 +56,12 @@ func (t *TaskCache) List() ([]*domain.Task, uint64) {
 	return t.inner.List()
 }
 
-func (t *TaskCache) fill(repository ports.TaskRepository) error {
-	tasks, err := repository.List(&ports.ListTasksFilter{
+func (t *TaskCache) Delete(id uint64) {
+	t.inner.Delete(id)
+}
+
+func (t *TaskCache) fill(ctx context.Context, repository ports.TaskRepository) error {
+	tasks, err := repository.List(ctx, &ports.ListTasksFilter{
 		Sort: ports.SortDesc,
 	})
 	if err != nil {

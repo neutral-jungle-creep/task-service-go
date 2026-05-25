@@ -232,3 +232,76 @@ func TestIntegration_ConcurrentCreates(t *testing.T) {
 	}
 	assert.Len(t, seen, n)
 }
+
+func TestIntegration_PatchTask_NameAndStatus(t *testing.T) {
+	env := setupTestEnv(t)
+	defer env.close(t)
+
+	base := env.server.URL + "/api/v1/task-service/tasks"
+
+	var created dto.CreateTaskResponse
+	require.Equal(t, http.StatusOK,
+		doJSON(t, http.MethodPost, base, dto.CreateTaskRequest{Name: "first", Body: "b"}, &created))
+
+	patch := map[string]any{"name": "renamed", "status": "IN_PROCESS"}
+	var got dto.GetTaskResponse
+	status := doJSON(t, http.MethodPatch, fmt.Sprintf("%s/%d", base, created.ID), patch, &got)
+	require.Equal(t, http.StatusOK, status)
+	assert.Equal(t, created.ID, got.ID)
+	assert.Equal(t, "renamed", got.Name)
+	assert.Equal(t, "b", got.Body)
+	assert.Equal(t, "IN_PROCESS", got.Status)
+	require.NotNil(t, got.UpdatedAt)
+}
+
+func TestIntegration_PatchTask_InvalidTransition(t *testing.T) {
+	env := setupTestEnv(t)
+	defer env.close(t)
+
+	base := env.server.URL + "/api/v1/task-service/tasks"
+
+	var created dto.CreateTaskResponse
+	require.Equal(t, http.StatusOK,
+		doJSON(t, http.MethodPost, base, dto.CreateTaskRequest{Name: "t", Body: "b"}, &created))
+
+	// NEW → COMPLETE is not allowed
+	patch := map[string]any{"status": "COMPLETE"}
+	status := doJSON(t, http.MethodPatch, fmt.Sprintf("%s/%d", base, created.ID), patch, nil)
+	assert.Equal(t, http.StatusBadRequest, status)
+}
+
+func TestIntegration_PatchTask_NotFound(t *testing.T) {
+	env := setupTestEnv(t)
+	defer env.close(t)
+
+	patch := map[string]any{"name": "x"}
+	status := doJSON(t, http.MethodPatch,
+		env.server.URL+"/api/v1/task-service/tasks/999999", patch, nil)
+	assert.Equal(t, http.StatusNotFound, status)
+}
+
+func TestIntegration_DeleteTask_OK(t *testing.T) {
+	env := setupTestEnv(t)
+	defer env.close(t)
+
+	base := env.server.URL + "/api/v1/task-service/tasks"
+
+	var created dto.CreateTaskResponse
+	require.Equal(t, http.StatusOK,
+		doJSON(t, http.MethodPost, base, dto.CreateTaskRequest{Name: "to-delete", Body: "b"}, &created))
+
+	delURL := fmt.Sprintf("%s/%d", base, created.ID)
+	require.Equal(t, http.StatusNoContent, doJSON(t, http.MethodDelete, delURL, nil, nil))
+
+	// Subsequent GET must be 404
+	require.Equal(t, http.StatusNotFound, doJSON(t, http.MethodGet, delURL, nil, nil))
+}
+
+func TestIntegration_DeleteTask_NotFound(t *testing.T) {
+	env := setupTestEnv(t)
+	defer env.close(t)
+
+	status := doJSON(t, http.MethodDelete,
+		env.server.URL+"/api/v1/task-service/tasks/999999", nil, nil)
+	assert.Equal(t, http.StatusNotFound, status)
+}

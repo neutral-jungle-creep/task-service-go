@@ -31,3 +31,9 @@ type CreateTaskRequest struct {
 type CreateTaskResponse struct {
 	ID uint64 `json:"id"`
 }
+
+type UpdateTaskRequest struct {
+	Name   *string `json:"name"   validate:"omitnil,min=1,max=255"`
+	Body   *string `json:"body"   validate:"omitnil,min=1,max=10000"`
+	Status *string `json:"status" validate:"omitnil,oneof=NEW IN_PROCESS PAUSE COMPLETE CANCEL"`
+}
