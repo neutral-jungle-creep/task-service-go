@@ -33,7 +33,7 @@ type Ordered interface {
 type Cache[K Ordered, V Sized] struct {
 	snapshotMu            sync.RWMutex
 	items                 sync.Map
-	len                   atomic.Uint64
+	len                   atomic.Int64 // signed so Add(-1) is straightforward; never goes negative under snapshotMu
 	cleanupStartMB        uint64
 	memoryMonitorInterval time.Duration
 	firstKey              atomic.Uint64
@@ -63,6 +63,34 @@ func (c *Cache[K, V]) Store(key K, value V) {
 		return
 	}
 	c.items.Store(key, value)
+}
+
+// Delete removes the entry for key (no-op if missing). Holds snapshotMu so
+// concurrent List sees the cache either before or after the deletion.
+func (c *Cache[K, V]) Delete(key K) {
+	c.snapshotMu.Lock()
+	defer c.snapshotMu.Unlock()
+
+	if _, ok := c.items.LoadAndDelete(key); !ok {
+		return
+	}
+	c.len.Add(-1)
+
+	// If the deleted key was firstKey, scan for the new smallest.
+	if uint64(key) == c.firstKey.Load() {
+		var next uint64
+		c.items.Range(func(k, _ any) bool {
+			cur, ok := k.(K)
+			if !ok {
+				return true
+			}
+			if next == 0 || uint64(cur) < next {
+				next = uint64(cur)
+			}
+			return true
+		})
+		c.firstKey.Store(next)
+	}
 }
 
 // Get returns the value for key and a boolean indicating whether it was found.
@@ -97,8 +125,14 @@ func (c *Cache[K, V]) List() ([]V, uint64) {
 }
 
 // Len returns the current number of cached entries.
+// The counter is signed internally but never goes negative — Delete only
+// decrements when LoadAndDelete succeeded, and snapshotMu serialises mutations.
 func (c *Cache[K, V]) Len() uint64 {
-	return c.len.Load()
+	v := c.len.Load()
+	if v < 0 {
+		return 0
+	}
+	return uint64(v)
 }
 
 // FirstKey returns the smallest key currently kept in the cache.
@@ -151,8 +185,8 @@ func (c *Cache[K, V]) Cleanup() {
 	c.snapshotMu.Lock()
 	defer c.snapshotMu.Unlock()
 
-	toRemove := c.len.Load() / 5 // drop the oldest 20% of cached records
-	if toRemove == 0 {
+	toRemove := int(c.len.Load() / 5) // drop the oldest 20% of cached records
+	if toRemove <= 0 {
 		return
 	}
 
@@ -169,15 +203,15 @@ func (c *Cache[K, V]) Cleanup() {
 	}
 	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 
-	if toRemove > uint64(len(keys)) {
-		toRemove = uint64(len(keys))
+	if toRemove > len(keys) {
+		toRemove = len(keys)
 	}
-	for i := uint64(0); i < toRemove; i++ {
+	for i := 0; i < toRemove; i++ {
 		c.items.Delete(keys[i])
-		c.len.Add(^uint64(0)) // atomic decrement
+		c.len.Add(-1)
 	}
 
-	if toRemove < uint64(len(keys)) {
+	if toRemove < len(keys) {
 		c.firstKey.Store(uint64(keys[toRemove]))
 	} else {
 		c.firstKey.Store(0)

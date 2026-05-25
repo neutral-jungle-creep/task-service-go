@@ -1,6 +1,7 @@
 package repositories_test
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"regexp"
@@ -38,10 +39,10 @@ func TestTaskRepository_Store_OK(t *testing.T) {
 	}
 
 	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO tasks")).
-		WithArgs("n", "b", string(domain.TaskStatusNew), created, task.UpdatedAt).
+		WithArgs("n", "b", domain.TaskStatusNew.String(), created, task.UpdatedAt).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
 
-	id, err := repo.Store(task)
+	id, err := repo.Store(context.Background(), task)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(42), id)
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -55,7 +56,12 @@ func TestTaskRepository_Store_DBError(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO tasks")).
 		WillReturnError(errors.New("connection refused"))
 
-	id, err := repo.Store(&domain.Task{Name: "x", Body: "y", Status: domain.TaskStatusNew, CreatedAt: time.Now()})
+	id, err := repo.Store(context.Background(), &domain.Task{
+		Name:      "x",
+		Body:      "y",
+		Status:    domain.TaskStatusNew,
+		CreatedAt: time.Now(),
+	})
 	require.Error(t, err)
 	assert.Zero(t, id)
 	assert.Contains(t, err.Error(), "store task")
@@ -77,7 +83,7 @@ func TestTaskRepository_Get_OK(t *testing.T) {
 		WithArgs(uint64(7)).
 		WillReturnRows(rows)
 
-	task, err := repo.Get(7)
+	task, err := repo.Get(context.Background(), 7)
 	require.NoError(t, err)
 	require.NotNil(t, task)
 	assert.Equal(t, uint64(7), task.ID)
@@ -99,7 +105,7 @@ func TestTaskRepository_Get_NotFound(t *testing.T) {
 		WithArgs(uint64(999)).
 		WillReturnError(sql.ErrNoRows)
 
-	task, err := repo.Get(999)
+	task, err := repo.Get(context.Background(), 999)
 	require.ErrorIs(t, err, domain.ErrTaskNotFound)
 	assert.Nil(t, task)
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -114,7 +120,7 @@ func TestTaskRepository_Get_DBError(t *testing.T) {
 		WithArgs(uint64(1)).
 		WillReturnError(errors.New("timeout"))
 
-	task, err := repo.Get(1)
+	task, err := repo.Get(context.Background(), 1)
 	require.Error(t, err)
 	require.NotErrorIs(t, err, domain.ErrTaskNotFound)
 	assert.Nil(t, task)
@@ -135,7 +141,7 @@ func TestTaskRepository_List_NoFilter_ASC(t *testing.T) {
 		WithArgs(uint64(1000), uint64(0)).
 		WillReturnRows(rows)
 
-	tasks, err := repo.List(nil)
+	tasks, err := repo.List(context.Background(), nil)
 	require.NoError(t, err)
 	require.Len(t, tasks, 2)
 	assert.Equal(t, uint64(1), tasks[0].ID)
@@ -154,7 +160,7 @@ func TestTaskRepository_List_Desc(t *testing.T) {
 		WithArgs(uint64(1000), uint64(0)).
 		WillReturnRows(rows)
 
-	tasks, err := repo.List(&ports.ListTasksFilter{Sort: ports.SortDesc})
+	tasks, err := repo.List(context.Background(), &ports.ListTasksFilter{Sort: ports.SortDesc})
 	require.NoError(t, err)
 	assert.Empty(t, tasks)
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -172,7 +178,7 @@ func TestTaskRepository_List_ToID_ASC(t *testing.T) {
 		WithArgs(uint64(10), uint64(1000), uint64(0)).
 		WillReturnRows(rows)
 
-	tasks, err := repo.List(&ports.ListTasksFilter{ToID: 10})
+	tasks, err := repo.List(context.Background(), &ports.ListTasksFilter{ToID: 10})
 	require.NoError(t, err)
 	require.Len(t, tasks, 1)
 	assert.Equal(t, uint64(5), tasks[0].ID)
@@ -190,7 +196,7 @@ func TestTaskRepository_List_ToID_Desc(t *testing.T) {
 		WithArgs(uint64(10), uint64(1000), uint64(0)).
 		WillReturnRows(rows)
 
-	_, err := repo.List(&ports.ListTasksFilter{Sort: ports.SortDesc, ToID: 10})
+	_, err := repo.List(context.Background(), &ports.ListTasksFilter{Sort: ports.SortDesc, ToID: 10})
 	require.NoError(t, err)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
@@ -203,7 +209,7 @@ func TestTaskRepository_List_QueryError(t *testing.T) {
 	mock.ExpectQuery(`SELECT .* FROM tasks`).
 		WillReturnError(errors.New("boom"))
 
-	tasks, err := repo.List(nil)
+	tasks, err := repo.List(context.Background(), nil)
 	require.Error(t, err)
 	assert.Nil(t, tasks)
 	assert.Contains(t, err.Error(), "list tasks")
@@ -223,7 +229,7 @@ func TestTaskRepository_List_ScanError(t *testing.T) {
 		WithArgs(uint64(1000), uint64(0)).
 		WillReturnRows(rows)
 
-	tasks, err := repo.List(nil)
+	tasks, err := repo.List(context.Background(), nil)
 	require.Error(t, err)
 	assert.Nil(t, tasks)
 	assert.Contains(t, err.Error(), "scan task")
@@ -241,7 +247,7 @@ func TestTaskRepository_List_HonoursLimitOffset(t *testing.T) {
 		WithArgs(uint64(25), uint64(50)).
 		WillReturnRows(rows)
 
-	_, err := repo.List(&ports.ListTasksFilter{Limit: 25, Offset: 50})
+	_, err := repo.List(context.Background(), &ports.ListTasksFilter{Limit: 25, Offset: 50})
 	require.NoError(t, err)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
@@ -254,7 +260,7 @@ func TestTaskRepository_Count_NoFilter(t *testing.T) {
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM tasks$`).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(int64(42)))
 
-	total, err := repo.Count(nil)
+	total, err := repo.Count(context.Background(), nil)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(42), total)
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -269,7 +275,7 @@ func TestTaskRepository_Count_WithToID(t *testing.T) {
 		WithArgs(uint64(10)).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(int64(7)))
 
-	total, err := repo.Count(&ports.ListTasksFilter{ToID: 10})
+	total, err := repo.Count(context.Background(), &ports.ListTasksFilter{ToID: 10})
 	require.NoError(t, err)
 	assert.Equal(t, uint64(7), total)
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -283,7 +289,7 @@ func TestTaskRepository_Count_QueryError(t *testing.T) {
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM tasks`).
 		WillReturnError(errors.New("nope"))
 
-	_, err := repo.Count(nil)
+	_, err := repo.Count(context.Background(), nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "count tasks")
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -302,9 +308,101 @@ func TestTaskRepository_List_RowsErr(t *testing.T) {
 		WithArgs(uint64(1000), uint64(0)).
 		WillReturnRows(rows)
 
-	tasks, err := repo.List(nil)
+	tasks, err := repo.List(context.Background(), nil)
 	require.Error(t, err)
 	assert.Nil(t, tasks)
 	assert.Contains(t, err.Error(), "iterate tasks")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Update_OK(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	created := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	updated := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
+	task := &domain.Task{
+		ID:        7,
+		Name:      "n",
+		Body:      "b",
+		Status:    domain.TaskStatusInProcess,
+		CreatedAt: created,
+		UpdatedAt: &updated,
+	}
+
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE tasks")).
+		WithArgs("n", "b", "IN_PROCESS", &updated, uint64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	require.NoError(t, repo.Update(context.Background(), task))
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Update_NotFound(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE tasks")).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	err := repo.Update(context.Background(), &domain.Task{ID: 999, Status: domain.TaskStatusNew})
+	require.ErrorIs(t, err, domain.ErrTaskNotFound)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Update_DBError(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE tasks")).
+		WillReturnError(errors.New("boom"))
+
+	err := repo.Update(context.Background(), &domain.Task{ID: 1})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "update task")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Delete_OK(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM tasks WHERE id = $1")).
+		WithArgs(uint64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	require.NoError(t, repo.Delete(context.Background(), 7))
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Delete_NotFound(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM tasks")).
+		WithArgs(uint64(999)).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	err := repo.Delete(context.Background(), 999)
+	require.ErrorIs(t, err, domain.ErrTaskNotFound)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Delete_DBError(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM tasks")).
+		WillReturnError(errors.New("nope"))
+
+	err := repo.Delete(context.Background(), 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "delete task")
 	require.NoError(t, mock.ExpectationsWereMet())
 }

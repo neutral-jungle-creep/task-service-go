@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"task-service/internal/domain"
+	"task-service/internal/ports"
 	"task-service/internal/server/dto"
 	"task-service/pkg/http/server"
 )
@@ -36,7 +37,7 @@ func (api *API) ListTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tasks, total, err := api.taskService.List(query.Limit, query.Offset)
+	tasks, total, err := api.taskService.List(r.Context(), query.Limit, query.Offset)
 	if err != nil {
 		api.responseHandler.SendErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -84,20 +85,13 @@ func parseListQuery(q url.Values) (dto.ListTasksQuery, error) {
 //	@Failure	500	{object}	protocol.ExceptionResponse
 //	@Router		/tasks/{id} [get]
 func (api *API) GetTask(w http.ResponseWriter, r *http.Request) {
-	params := server.RequestParams(r)
-	idParam := params["id"]
-	if len(idParam) == 0 {
-		api.responseHandler.SendErrorResponse(w, http.StatusBadRequest, errors.New("id is required"))
-		return
-	}
-
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := parsePathID(r)
 	if err != nil {
 		api.responseHandler.SendErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
 
-	task, err := api.taskService.Get(id)
+	task, err := api.taskService.Get(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, domain.ErrTaskNotFound) {
 			api.responseHandler.SendErrorResponse(w, http.StatusNotFound, err)
@@ -109,6 +103,97 @@ func (api *API) GetTask(w http.ResponseWriter, r *http.Request) {
 
 	response := taskFromDomain(task)
 	api.responseHandler.SendSuccessResponse(w, http.StatusOK, response)
+}
+
+// UpdateTask applies a partial update to a task.
+//
+//	@Summary	Update task
+//	@Tags		tasks
+//	@Accept		json
+//	@Produce	json
+//	@Param		id		path		uint64				true	"Task id"
+//	@Param		payload	body		dto.UpdateTaskRequest	true	"Fields to update"
+//	@Success	200		{object}	dto.GetTaskResponse
+//	@Failure	400		{object}	protocol.ExceptionResponse
+//	@Failure	404		{object}	protocol.ExceptionResponse
+//	@Failure	500		{object}	protocol.ExceptionResponse
+//	@Router		/tasks/{id} [patch]
+func (api *API) UpdateTask(w http.ResponseWriter, r *http.Request) {
+	id, err := parsePathID(r)
+	if err != nil {
+		api.responseHandler.SendErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
+	var body dto.UpdateTaskRequest
+	err = api.responseHandler.BindJSON(r.Body, &body)
+	if err != nil {
+		api.responseHandler.SendErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
+	updated, err := api.taskService.Update(r.Context(), id, ports.UpdateTaskParams{
+		Name:   body.Name,
+		Body:   body.Body,
+		Status: body.Status,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrTaskNotFound):
+			api.responseHandler.SendErrorResponse(w, http.StatusNotFound, err)
+		case errors.Is(err, domain.ErrInvalidStatusTransition), errors.Is(err, domain.ErrUnknownStatus):
+			api.responseHandler.SendErrorResponse(w, http.StatusBadRequest, err)
+		default:
+			api.responseHandler.SendErrorResponse(w, http.StatusInternalServerError, err)
+		}
+		return
+	}
+
+	api.responseHandler.SendSuccessResponse(w, http.StatusOK, taskFromDomain(updated))
+}
+
+// DeleteTask removes a task by id.
+//
+//	@Summary	Delete task
+//	@Tags		tasks
+//	@Produce	json
+//	@Param		id	path	uint64	true	"Task id"
+//	@Success	204	"No Content"
+//	@Failure	400	{object}	protocol.ExceptionResponse
+//	@Failure	404	{object}	protocol.ExceptionResponse
+//	@Failure	500	{object}	protocol.ExceptionResponse
+//	@Router		/tasks/{id} [delete]
+func (api *API) DeleteTask(w http.ResponseWriter, r *http.Request) {
+	id, err := parsePathID(r)
+	if err != nil {
+		api.responseHandler.SendErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
+	err = api.taskService.Delete(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			api.responseHandler.SendErrorResponse(w, http.StatusNotFound, err)
+			return
+		}
+		api.responseHandler.SendErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func parsePathID(r *http.Request) (uint64, error) {
+	params := server.RequestParams(r)
+	idParam := params["id"]
+	if len(idParam) == 0 {
+		return 0, errors.New("task id is required")
+	}
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
 }
 
 // CreateTask creates a new task and returns its id.
@@ -130,7 +215,7 @@ func (api *API) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := api.taskService.Create(domain.NewTask(params.Name, params.Body))
+	id, err := api.taskService.Create(r.Context(), domain.NewTask(params.Name, params.Body))
 	if err != nil {
 		api.responseHandler.SendErrorResponse(w, http.StatusInternalServerError, err)
 		return
