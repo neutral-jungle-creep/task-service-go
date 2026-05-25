@@ -51,7 +51,7 @@ Layered architecture with a DI container (`internal/root`):
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                          cmd/main.go                             │
-│           load config → create logger → root.New → Run            │
+│           load config → create logger → root.New → Run           │
 └──────────────────────────────┬───────────────────────────────────┘
                                │
 ┌──────────────────────────────▼───────────────────────────────────┐
@@ -70,8 +70,8 @@ Layered architecture with a DI container (`internal/root`):
                      └────────┬──────────┴─────────────────┘
                               │
                   ┌───────────▼────────────┐
-                  │   internal/ports        │   ← interfaces between layers
-                  │   internal/domain       │   ← Task entity
+                  │   internal/ports       │   ← interfaces between layers
+                  │   internal/domain      │   ← Task entity
                   └────────────────────────┘
 ```
 
