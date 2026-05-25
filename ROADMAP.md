@@ -58,21 +58,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ## Roadmap фич
 
-### 3. Валидация входных DTO через `go-playground/validator`
-
-**Что:** заменить ручную проверку в `CreateTask` на тэги + единую функцию валидации.
-
-**Где:**
-- `internal/server/dto/dto.go` — теги `validate:"required,min=1,max=255"` на полях.
-- Подключить `github.com/go-playground/validator/v10`, держать singleton.
-- В `pkg/http/protocol/` добавить вспомогалку `ValidateAndBind(r *http.Request, v any) error`.
-- Обновить тесты — проверить разные сценарии валидации (пустые поля, слишком длинные, нарушение формата).
-
-**Учесть депенденси:** `validator/v10` весит ~200KB; для текущего сервиса это нормально.
-
----
-
-### 4. Метрики Prometheus (`/metrics`)
+### 3. Метрики Prometheus (`/metrics`)
 
 **Что:** инструментация HTTP и БД, выкладывание `/metrics` эндпоинта.
 
@@ -85,7 +71,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 5. Distributed tracing (OpenTelemetry)
+### 4. Distributed tracing (OpenTelemetry)
 
 **Что:** трассировка запросов через OTEL SDK с экспортом в Jaeger/Tempo.
 
@@ -99,7 +85,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 6. Аутентификация (JWT / API token)
+### 5. Аутентификация (JWT / API token)
 
 **Что:** middleware проверки токена; неавторизованные запросы → 401.
 
@@ -113,7 +99,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 7. PATCH / DELETE для задач
+### 6. PATCH / DELETE для задач
 
 **Что:** добавить ручки `PATCH /tasks/{id}` и `DELETE /tasks/{id}`.
 
@@ -138,7 +124,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 8. Лимит размера тела запроса и rate limiting
+### 7. Лимит размера тела запроса и rate limiting
 
 **Размер тела:**
 - В `internal/server/task.go` — `r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)` перед `io.ReadAll`.
