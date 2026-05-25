@@ -132,9 +132,11 @@ func (api *API) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fields := updateFieldsFromDTO(body)
-
-	updated, err := api.taskService.Update(id, fields)
+	updated, err := api.taskService.Update(id, ports.UpdateTaskParams{
+		Name:   body.Name,
+		Body:   body.Body,
+		Status: body.Status,
+	})
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrTaskNotFound):
@@ -192,18 +194,6 @@ func parsePathID(r *http.Request) (uint64, error) {
 		return 0, err
 	}
 	return id, nil
-}
-
-func updateFieldsFromDTO(body dto.UpdateTaskRequest) ports.UpdateTaskFields {
-	out := ports.UpdateTaskFields{
-		Name: body.Name,
-		Body: body.Body,
-	}
-	if body.Status != nil {
-		s := domain.TaskStatus(*body.Status)
-		out.Status = &s
-	}
-	return out
 }
 
 // CreateTask creates a new task and returns its id.
