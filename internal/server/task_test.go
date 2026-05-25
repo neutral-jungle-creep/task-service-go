@@ -9,13 +9,19 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"task-service/internal/domain"
 	"task-service/internal/server"
 	"task-service/internal/server/dto"
+	"task-service/pkg/http/protocol"
 )
+
+type silentLogger struct{}
+
+func (silentLogger) Error(string, error) {}
 
 type stubService struct {
 	createFunc func(*domain.Task) (uint64, error)
@@ -48,7 +54,11 @@ const routeGroup = "/api/v1/task-service"
 
 func newTestServer(t *testing.T, svc *stubService) http.Handler {
 	t.Helper()
-	api := server.NewAPI(svc)
+	rh := protocol.NewResponseHandler(
+		silentLogger{},
+		protocol.WithValidation(validator.New(validator.WithRequiredStructEnabled())),
+	)
+	api := server.NewAPI(svc, rh)
 	return api.InitRoutes(routeGroup)
 }
 
@@ -92,6 +102,55 @@ func TestApi_CreateTask_BadJSON(t *testing.T) {
 	newTestServer(t, &stubService{}).ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestApi_CreateTask_EmptyName(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost,
+		routeGroup+"/tasks",
+		strings.NewReader(`{"name":"","body":"b"}`),
+	)
+	rec := httptest.NewRecorder()
+	newTestServer(t, &stubService{}).ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), "Name")
+}
+
+func TestApi_CreateTask_EmptyBody(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost,
+		routeGroup+"/tasks",
+		strings.NewReader(`{"name":"n","body":""}`),
+	)
+	rec := httptest.NewRecorder()
+	newTestServer(t, &stubService{}).ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), "Body")
+}
+
+func TestApi_CreateTask_NameTooLong(t *testing.T) {
+	t.Parallel()
+
+	longName := strings.Repeat("x", 256)
+	req := httptest.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost,
+		routeGroup+"/tasks",
+		strings.NewReader(`{"name":"`+longName+`","body":"b"}`),
+	)
+	rec := httptest.NewRecorder()
+	newTestServer(t, &stubService{}).ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), "Name")
 }
 
 func TestApi_CreateTask_ServiceError(t *testing.T) {

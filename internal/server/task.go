@@ -1,28 +1,17 @@
 package server
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 
 	"task-service/internal/domain"
 	"task-service/internal/server/dto"
-	"task-service/pkg/http/protocol"
 	"task-service/pkg/http/server"
 )
 
-const (
-	readRequestBodyError      = "failed to read request body"
-	incorrectRequestBodyError = "incorrect request body"
-	internalServerError       = "internal server error"
-
-	defaultListLimit = 50
-	maxListLimit     = 500
-)
+const defaultListLimit = 50
 
 // ListTasks returns a paginated page of tasks plus the total row count.
 //
@@ -36,54 +25,51 @@ const (
 //	@Failure	500		{object}	protocol.ExceptionResponse
 //	@Router		/tasks [get]
 func (api *API) ListTasks(w http.ResponseWriter, r *http.Request) {
-	limit, offset, err := parsePagination(r.URL.Query())
+	query, err := parseListQuery(r.URL.Query())
 	if err != nil {
-		protocol.SendErrorResponse(w, http.StatusBadRequest, incorrectRequestBodyError, err)
+		api.responseHandler.SendErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+	err = api.responseHandler.Validate(&query)
+	if err != nil {
+		api.responseHandler.SendErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
 
-	tasks, total, err := api.taskService.List(limit, offset)
+	tasks, total, err := api.taskService.List(query.Limit, query.Offset)
 	if err != nil {
-		protocol.SendErrorResponse(w, http.StatusInternalServerError, internalServerError, err)
+		api.responseHandler.SendErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	response := dto.ListTasksResponse{
 		Items:  tasksFromDomain(tasks),
 		Total:  total,
-		Limit:  limit,
-		Offset: offset,
+		Limit:  query.Limit,
+		Offset: query.Offset,
 	}
-	protocol.SendSuccessResponse(w, http.StatusOK, response)
+	api.responseHandler.SendSuccessResponse(w, http.StatusOK, response)
 }
 
-// parsePagination reads ?limit=N&offset=M with the rules:
-//   - missing → defaults (50, 0);
-//   - non-numeric or negative → 400;
-//   - limit > maxListLimit → 400.
-func parsePagination(q url.Values) (limit, offset uint64, err error) {
-	limit = defaultListLimit
+// parseListQuery reads ?limit=N&offset=M and applies defaults. Validation of
+// the resulting struct is performed by ResponseHandler.Validate.
+func parseListQuery(q url.Values) (dto.ListTasksQuery, error) {
+	out := dto.ListTasksQuery{Limit: defaultListLimit}
 	if raw := q.Get("limit"); raw != "" {
-		v, parseErr := strconv.ParseUint(raw, 10, 64)
-		if parseErr != nil {
-			return 0, 0, errors.New("limit must be a non-negative integer")
+		v, err := strconv.ParseUint(raw, 10, 64)
+		if err != nil {
+			return out, errors.New("limit must be a non-negative integer")
 		}
-		if v == 0 {
-			return 0, 0, errors.New("limit must be > 0")
-		}
-		if v > maxListLimit {
-			return 0, 0, fmt.Errorf("limit must be <= %d", maxListLimit)
-		}
-		limit = v
+		out.Limit = v
 	}
 	if raw := q.Get("offset"); raw != "" {
-		v, parseErr := strconv.ParseUint(raw, 10, 64)
-		if parseErr != nil {
-			return 0, 0, errors.New("offset must be a non-negative integer")
+		v, err := strconv.ParseUint(raw, 10, 64)
+		if err != nil {
+			return out, errors.New("offset must be a non-negative integer")
 		}
-		offset = v
+		out.Offset = v
 	}
-	return limit, offset, nil
+	return out, nil
 }
 
 // GetTask returns a single task by id.
@@ -101,28 +87,28 @@ func (api *API) GetTask(w http.ResponseWriter, r *http.Request) {
 	params := server.RequestParams(r)
 	idParam := params["id"]
 	if len(idParam) == 0 {
-		protocol.SendErrorResponse(w, http.StatusBadRequest, incorrectRequestBodyError, errors.New("id is required"))
+		api.responseHandler.SendErrorResponse(w, http.StatusBadRequest, errors.New("id is required"))
 		return
 	}
 
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		protocol.SendErrorResponse(w, http.StatusBadRequest, incorrectRequestBodyError, err)
+		api.responseHandler.SendErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
 
 	task, err := api.taskService.Get(id)
 	if err != nil {
 		if errors.Is(err, domain.ErrTaskNotFound) {
-			protocol.SendErrorResponse(w, http.StatusNotFound, "", err)
+			api.responseHandler.SendErrorResponse(w, http.StatusNotFound, err)
 			return
 		}
-		protocol.SendErrorResponse(w, http.StatusInternalServerError, internalServerError, err)
+		api.responseHandler.SendErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	response := taskFromDomain(task)
-	protocol.SendSuccessResponse(w, http.StatusOK, response)
+	api.responseHandler.SendSuccessResponse(w, http.StatusOK, response)
 }
 
 // CreateTask creates a new task and returns its id.
@@ -137,33 +123,21 @@ func (api *API) GetTask(w http.ResponseWriter, r *http.Request) {
 //	@Failure	500		{object}	protocol.ExceptionResponse
 //	@Router		/tasks [post]
 func (api *API) CreateTask(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
+	var params dto.CreateTaskRequest
+	err := api.responseHandler.BindJSON(r.Body, &params)
 	if err != nil {
-		protocol.SendErrorResponse(w, http.StatusBadRequest, readRequestBodyError, err)
-		return
-	}
-
-	var params *dto.CreateTaskRequest
-	err = json.Unmarshal(body, &params)
-	if err != nil {
-		protocol.SendErrorResponse(w, http.StatusBadRequest, incorrectRequestBodyError, err)
-		return
-	}
-
-	if params == nil || params.Name == "" || params.Body == "" {
-		protocol.SendErrorResponse(w, http.StatusBadRequest, incorrectRequestBodyError,
-			errors.New("name and body are required"))
+		api.responseHandler.SendErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
 
 	id, err := api.taskService.Create(domain.NewTask(params.Name, params.Body))
 	if err != nil {
-		protocol.SendErrorResponse(w, http.StatusInternalServerError, internalServerError, err)
+		api.responseHandler.SendErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	response := dto.CreateTaskResponse{
 		ID: id,
 	}
-	protocol.SendSuccessResponse(w, http.StatusOK, response)
+	api.responseHandler.SendSuccessResponse(w, http.StatusOK, response)
 }
