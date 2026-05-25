@@ -7,6 +7,8 @@ type TaskRepository interface {
 	List(filter *ListTasksFilter) ([]*domain.Task, error)
 	Count(filter *ListTasksFilter) (uint64, error)
 	Get(id uint64) (*domain.Task, error)
+	Update(task *domain.Task) error
+	Delete(id uint64) error
 }
 
 const (
