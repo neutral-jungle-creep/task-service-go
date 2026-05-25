@@ -58,7 +58,7 @@ func newTestServer(t *testing.T, svc *stubService) http.Handler {
 		silentLogger{},
 		protocol.WithValidation(validator.New(validator.WithRequiredStructEnabled())),
 	)
-	api := server.NewAPI(svc, rh)
+	api := server.NewAPI(rh, svc)
 	return api.InitRoutes(routeGroup)
 }
 

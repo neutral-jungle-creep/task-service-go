@@ -76,7 +76,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 		async,
 		protocol.WithValidation(validator.New(validator.WithRequiredStructEnabled())),
 	)
-	api := server.NewAPI(svc, rh)
+	api := server.NewAPI(rh, svc)
 
 	httpSrv := httptest.NewServer(api.InitRoutes("/api/v1/task-service"))
 
