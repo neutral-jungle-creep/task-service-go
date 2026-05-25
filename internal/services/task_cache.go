@@ -51,6 +51,10 @@ func (t *TaskCache) List() ([]*domain.Task, uint64) {
 	return t.inner.List()
 }
 
+func (t *TaskCache) Delete(id uint64) {
+	t.inner.Delete(id)
+}
+
 func (t *TaskCache) fill(repository ports.TaskRepository) error {
 	tasks, err := repository.List(&ports.ListTasksFilter{
 		Sort: ports.SortDesc,
