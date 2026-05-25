@@ -15,52 +15,52 @@ import (
 )
 
 type stubRepo struct {
-	storeFunc  func(*domain.Task) (uint64, error)
-	listFunc   func(*ports.ListTasksFilter) ([]*domain.Task, error)
-	countFunc  func(*ports.ListTasksFilter) (uint64, error)
-	getFunc    func(uint64) (*domain.Task, error)
-	updateFunc func(*domain.Task) error
-	deleteFunc func(uint64) error
+	storeFunc  func(context.Context, *domain.Task) (uint64, error)
+	listFunc   func(context.Context, *ports.ListTasksFilter) ([]*domain.Task, error)
+	countFunc  func(context.Context, *ports.ListTasksFilter) (uint64, error)
+	getFunc    func(context.Context, uint64) (*domain.Task, error)
+	updateFunc func(context.Context, *domain.Task) error
+	deleteFunc func(context.Context, uint64) error
 }
 
-func (s *stubRepo) Update(t *domain.Task) error {
+func (s *stubRepo) Update(ctx context.Context, t *domain.Task) error {
 	if s.updateFunc != nil {
-		return s.updateFunc(t)
+		return s.updateFunc(ctx, t)
 	}
 	return nil
 }
 
-func (s *stubRepo) Delete(id uint64) error {
+func (s *stubRepo) Delete(ctx context.Context, id uint64) error {
 	if s.deleteFunc != nil {
-		return s.deleteFunc(id)
+		return s.deleteFunc(ctx, id)
 	}
 	return nil
 }
 
-func (s *stubRepo) Store(t *domain.Task) (uint64, error) {
+func (s *stubRepo) Store(ctx context.Context, t *domain.Task) (uint64, error) {
 	if s.storeFunc != nil {
-		return s.storeFunc(t)
+		return s.storeFunc(ctx, t)
 	}
 	return 0, nil
 }
 
-func (s *stubRepo) List(f *ports.ListTasksFilter) ([]*domain.Task, error) {
+func (s *stubRepo) List(ctx context.Context, f *ports.ListTasksFilter) ([]*domain.Task, error) {
 	if s.listFunc != nil {
-		return s.listFunc(f)
+		return s.listFunc(ctx, f)
 	}
 	return nil, nil
 }
 
-func (s *stubRepo) Count(f *ports.ListTasksFilter) (uint64, error) {
+func (s *stubRepo) Count(ctx context.Context, f *ports.ListTasksFilter) (uint64, error) {
 	if s.countFunc != nil {
-		return s.countFunc(f)
+		return s.countFunc(ctx, f)
 	}
 	return 0, nil
 }
 
-func (s *stubRepo) Get(id uint64) (*domain.Task, error) {
+func (s *stubRepo) Get(ctx context.Context, id uint64) (*domain.Task, error) {
 	if s.getFunc != nil {
-		return s.getFunc(id)
+		return s.getFunc(ctx, id)
 	}
 	return &domain.Task{}, nil
 }
@@ -117,12 +117,12 @@ func TestTaskService_Create(t *testing.T) {
 	t.Parallel()
 
 	repo := &stubRepo{
-		storeFunc: func(_ *domain.Task) (uint64, error) { return 99, nil },
+		storeFunc: func(_ context.Context, _ *domain.Task) (uint64, error) { return 99, nil },
 	}
 	cache := &stubCache{}
 
 	svc := services.NewTaskService(newAsyncLogger(t), repo, cache)
-	id, err := svc.Create(domain.NewTask("n", "b"))
+	id, err := svc.Create(context.Background(), domain.NewTask("n", "b"))
 
 	require.NoError(t, err)
 	assert.Equal(t, uint64(99), id)
@@ -136,11 +136,11 @@ func TestTaskService_Create_RepoError(t *testing.T) {
 	want := errors.New("boom")
 	svc := services.NewTaskService(
 		newAsyncLogger(t),
-		&stubRepo{storeFunc: func(_ *domain.Task) (uint64, error) { return 0, want }},
+		&stubRepo{storeFunc: func(_ context.Context, _ *domain.Task) (uint64, error) { return 0, want }},
 		&stubCache{},
 	)
 
-	id, err := svc.Create(domain.NewTask("n", "b"))
+	id, err := svc.Create(context.Background(), domain.NewTask("n", "b"))
 	require.ErrorIs(t, err, want)
 	assert.Zero(t, id)
 }
@@ -155,14 +155,14 @@ func TestTaskService_Get_FromCache(t *testing.T) {
 	}
 	repoCalls := 0
 	repo := &stubRepo{
-		getFunc: func(uint64) (*domain.Task, error) {
+		getFunc: func(context.Context, uint64) (*domain.Task, error) {
 			repoCalls++
 			return &domain.Task{}, nil
 		},
 	}
 
 	svc := services.NewTaskService(newAsyncLogger(t), repo, cache)
-	got, err := svc.Get(7)
+	got, err := svc.Get(context.Background(), 7)
 	require.NoError(t, err)
 	assert.Equal(t, "cached", got.Name)
 	assert.Zero(t, repoCalls, "repository should not be queried when cache hits")
@@ -172,14 +172,14 @@ func TestTaskService_Get_FromRepo(t *testing.T) {
 	t.Parallel()
 
 	repo := &stubRepo{
-		getFunc: func(id uint64) (*domain.Task, error) {
+		getFunc: func(_ context.Context, id uint64) (*domain.Task, error) {
 			return &domain.Task{ID: id, Name: "from-db"}, nil
 		},
 	}
 	cache := &stubCache{}
 
 	svc := services.NewTaskService(newAsyncLogger(t), repo, cache)
-	got, err := svc.Get(11)
+	got, err := svc.Get(context.Background(), 11)
 	require.NoError(t, err)
 	assert.Equal(t, "from-db", got.Name)
 	assert.Equal(t, uint64(11), got.ID)
@@ -189,13 +189,13 @@ func TestTaskService_List_PassesPaginationToRepo(t *testing.T) {
 	t.Parallel()
 
 	repo := &stubRepo{
-		listFunc: func(f *ports.ListTasksFilter) ([]*domain.Task, error) {
+		listFunc: func(_ context.Context, f *ports.ListTasksFilter) ([]*domain.Task, error) {
 			require.NotNil(t, f)
 			assert.Equal(t, uint64(25), f.Limit)
 			assert.Equal(t, uint64(50), f.Offset)
 			return []*domain.Task{{ID: 1}, {ID: 2}}, nil
 		},
-		countFunc: func(f *ports.ListTasksFilter) (uint64, error) {
+		countFunc: func(_ context.Context, f *ports.ListTasksFilter) (uint64, error) {
 			require.NotNil(t, f)
 			return 123, nil
 		},
@@ -203,7 +203,7 @@ func TestTaskService_List_PassesPaginationToRepo(t *testing.T) {
 
 	svc := services.NewTaskService(newAsyncLogger(t), repo, &stubCache{})
 
-	tasks, total, err := svc.List(25, 50)
+	tasks, total, err := svc.List(context.Background(), 25, 50)
 	require.NoError(t, err)
 	require.Len(t, tasks, 2)
 	assert.Equal(t, uint64(123), total)
@@ -213,12 +213,12 @@ func TestTaskService_List_CountError(t *testing.T) {
 	t.Parallel()
 
 	repo := &stubRepo{
-		countFunc: func(*ports.ListTasksFilter) (uint64, error) { return 0, errors.New("count failed") },
+		countFunc: func(context.Context, *ports.ListTasksFilter) (uint64, error) { return 0, errors.New("count failed") },
 	}
 
 	svc := services.NewTaskService(newAsyncLogger(t), repo, &stubCache{})
 
-	_, _, err := svc.List(10, 0)
+	_, _, err := svc.List(context.Background(), 10, 0)
 	require.Error(t, err)
 }
 
@@ -226,15 +226,15 @@ func TestTaskService_List_ListError(t *testing.T) {
 	t.Parallel()
 
 	repo := &stubRepo{
-		countFunc: func(*ports.ListTasksFilter) (uint64, error) { return 5, nil },
-		listFunc: func(*ports.ListTasksFilter) ([]*domain.Task, error) {
+		countFunc: func(context.Context, *ports.ListTasksFilter) (uint64, error) { return 5, nil },
+		listFunc: func(context.Context, *ports.ListTasksFilter) ([]*domain.Task, error) {
 			return nil, errors.New("list failed")
 		},
 	}
 
 	svc := services.NewTaskService(newAsyncLogger(t), repo, &stubCache{})
 
-	_, _, err := svc.List(10, 0)
+	_, _, err := svc.List(context.Background(), 10, 0)
 	require.Error(t, err)
 }
 
@@ -242,10 +242,10 @@ func TestTaskService_Update_OK(t *testing.T) {
 	t.Parallel()
 
 	repo := &stubRepo{
-		getFunc: func(id uint64) (*domain.Task, error) {
+		getFunc: func(_ context.Context, id uint64) (*domain.Task, error) {
 			return &domain.Task{ID: id, Name: "old", Body: "old-body", Status: domain.TaskStatusNew}, nil
 		},
-		updateFunc: func(task *domain.Task) error {
+		updateFunc: func(_ context.Context, task *domain.Task) error {
 			assert.Equal(t, "new-name", task.Name)
 			assert.Equal(t, domain.TaskStatusInProcess, task.Status)
 			require.NotNil(t, task.UpdatedAt)
@@ -255,10 +255,10 @@ func TestTaskService_Update_OK(t *testing.T) {
 	cache := &stubCache{}
 
 	newName := "new-name"
-	newStatus := string(domain.TaskStatusInProcess)
+	newStatus := domain.TaskStatusInProcess.String()
 
 	svc := services.NewTaskService(newAsyncLogger(t), repo, cache)
-	updated, err := svc.Update(1, ports.UpdateTaskParams{
+	updated, err := svc.Update(context.Background(), 1, ports.UpdateTaskParams{
 		Name:   &newName,
 		Status: &newStatus,
 	})
@@ -272,10 +272,10 @@ func TestTaskService_Update_NotFound(t *testing.T) {
 	t.Parallel()
 
 	repo := &stubRepo{
-		getFunc: func(uint64) (*domain.Task, error) { return nil, domain.ErrTaskNotFound },
+		getFunc: func(context.Context, uint64) (*domain.Task, error) { return nil, domain.ErrTaskNotFound },
 	}
 	svc := services.NewTaskService(newAsyncLogger(t), repo, &stubCache{})
-	_, err := svc.Update(1, ports.UpdateTaskParams{})
+	_, err := svc.Update(context.Background(), 1, ports.UpdateTaskParams{})
 	require.ErrorIs(t, err, domain.ErrTaskNotFound)
 }
 
@@ -283,14 +283,14 @@ func TestTaskService_Update_InvalidTransition(t *testing.T) {
 	t.Parallel()
 
 	repo := &stubRepo{
-		getFunc: func(uint64) (*domain.Task, error) {
+		getFunc: func(context.Context, uint64) (*domain.Task, error) {
 			return &domain.Task{Status: domain.TaskStatusComplete}, nil
 		},
 	}
 	svc := services.NewTaskService(newAsyncLogger(t), repo, &stubCache{})
 
-	status := string(domain.TaskStatusInProcess)
-	_, err := svc.Update(1, ports.UpdateTaskParams{Status: &status})
+	status := domain.TaskStatusInProcess.String()
+	_, err := svc.Update(context.Background(), 1, ports.UpdateTaskParams{Status: &status})
 	require.ErrorIs(t, err, domain.ErrInvalidStatusTransition)
 }
 
@@ -298,14 +298,14 @@ func TestTaskService_Update_UnknownStatus(t *testing.T) {
 	t.Parallel()
 
 	repo := &stubRepo{
-		getFunc: func(uint64) (*domain.Task, error) {
+		getFunc: func(context.Context, uint64) (*domain.Task, error) {
 			return &domain.Task{Status: domain.TaskStatusNew}, nil
 		},
 	}
 	svc := services.NewTaskService(newAsyncLogger(t), repo, &stubCache{})
 
 	bogus := "BOGUS"
-	_, err := svc.Update(1, ports.UpdateTaskParams{Status: &bogus})
+	_, err := svc.Update(context.Background(), 1, ports.UpdateTaskParams{Status: &bogus})
 	require.ErrorIs(t, err, domain.ErrUnknownStatus)
 }
 
@@ -313,12 +313,12 @@ func TestTaskService_Delete_OK(t *testing.T) {
 	t.Parallel()
 
 	repo := &stubRepo{
-		deleteFunc: func(uint64) error { return nil },
+		deleteFunc: func(context.Context, uint64) error { return nil },
 	}
 	cache := &stubCache{}
 	svc := services.NewTaskService(newAsyncLogger(t), repo, cache)
 
-	require.NoError(t, svc.Delete(42))
+	require.NoError(t, svc.Delete(context.Background(), 42))
 	assert.Equal(t, []uint64{42}, cache.deleted)
 }
 
@@ -326,12 +326,12 @@ func TestTaskService_Delete_NotFound(t *testing.T) {
 	t.Parallel()
 
 	repo := &stubRepo{
-		deleteFunc: func(uint64) error { return domain.ErrTaskNotFound },
+		deleteFunc: func(context.Context, uint64) error { return domain.ErrTaskNotFound },
 	}
 	cache := &stubCache{}
 	svc := services.NewTaskService(newAsyncLogger(t), repo, cache)
 
-	err := svc.Delete(99)
+	err := svc.Delete(context.Background(), 99)
 	require.ErrorIs(t, err, domain.ErrTaskNotFound)
 	assert.Equal(t, []uint64{99}, cache.deleted, "cache eviction should still run on not-found")
 }

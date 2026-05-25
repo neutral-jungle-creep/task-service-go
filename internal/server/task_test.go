@@ -25,44 +25,44 @@ type silentLogger struct{}
 func (silentLogger) Error(string, error) {}
 
 type stubService struct {
-	createFunc func(*domain.Task) (uint64, error)
-	listFunc   func(limit, offset uint64) ([]*domain.Task, uint64, error)
-	getFunc    func(uint64) (*domain.Task, error)
-	updateFunc func(uint64, ports.UpdateTaskParams) (*domain.Task, error)
-	deleteFunc func(uint64) error
+	createFunc func(context.Context, *domain.Task) (uint64, error)
+	listFunc   func(ctx context.Context, limit, offset uint64) ([]*domain.Task, uint64, error)
+	getFunc    func(context.Context, uint64) (*domain.Task, error)
+	updateFunc func(context.Context, uint64, ports.UpdateTaskParams) (*domain.Task, error)
+	deleteFunc func(context.Context, uint64) error
 }
 
-func (s *stubService) Create(t *domain.Task) (uint64, error) {
+func (s *stubService) Create(ctx context.Context, t *domain.Task) (uint64, error) {
 	if s.createFunc != nil {
-		return s.createFunc(t)
+		return s.createFunc(ctx, t)
 	}
 	return 1, nil
 }
 
-func (s *stubService) List(limit, offset uint64) ([]*domain.Task, uint64, error) {
+func (s *stubService) List(ctx context.Context, limit, offset uint64) ([]*domain.Task, uint64, error) {
 	if s.listFunc != nil {
-		return s.listFunc(limit, offset)
+		return s.listFunc(ctx, limit, offset)
 	}
 	return nil, 0, nil
 }
 
-func (s *stubService) Get(id uint64) (*domain.Task, error) {
+func (s *stubService) Get(ctx context.Context, id uint64) (*domain.Task, error) {
 	if s.getFunc != nil {
-		return s.getFunc(id)
+		return s.getFunc(ctx, id)
 	}
 	return &domain.Task{}, nil
 }
 
-func (s *stubService) Update(id uint64, f ports.UpdateTaskParams) (*domain.Task, error) {
+func (s *stubService) Update(ctx context.Context, id uint64, f ports.UpdateTaskParams) (*domain.Task, error) {
 	if s.updateFunc != nil {
-		return s.updateFunc(id, f)
+		return s.updateFunc(ctx, id, f)
 	}
 	return &domain.Task{}, nil
 }
 
-func (s *stubService) Delete(id uint64) error {
+func (s *stubService) Delete(ctx context.Context, id uint64) error {
 	if s.deleteFunc != nil {
-		return s.deleteFunc(id)
+		return s.deleteFunc(ctx, id)
 	}
 	return nil
 }
@@ -83,7 +83,7 @@ func TestApi_CreateTask_OK(t *testing.T) {
 	t.Parallel()
 
 	svc := &stubService{
-		createFunc: func(task *domain.Task) (uint64, error) {
+		createFunc: func(_ context.Context, task *domain.Task) (uint64, error) {
 			assert.Equal(t, "n", task.Name)
 			assert.Equal(t, "b", task.Body)
 			return 42, nil
@@ -174,7 +174,7 @@ func TestApi_CreateTask_ServiceError(t *testing.T) {
 	t.Parallel()
 
 	svc := &stubService{
-		createFunc: func(*domain.Task) (uint64, error) {
+		createFunc: func(context.Context, *domain.Task) (uint64, error) {
 			return 0, errors.New("db down")
 		},
 	}
@@ -195,7 +195,7 @@ func TestApi_ListTasks_OK_DefaultPagination(t *testing.T) {
 	t.Parallel()
 
 	svc := &stubService{
-		listFunc: func(limit, offset uint64) ([]*domain.Task, uint64, error) {
+		listFunc: func(_ context.Context, limit, offset uint64) ([]*domain.Task, uint64, error) {
 			assert.Equal(t, uint64(50), limit)
 			assert.Equal(t, uint64(0), offset)
 			return []*domain.Task{{ID: 1, Name: "a"}, {ID: 2, Name: "b"}}, 17, nil
@@ -220,7 +220,7 @@ func TestApi_ListTasks_OK_CustomPagination(t *testing.T) {
 	t.Parallel()
 
 	svc := &stubService{
-		listFunc: func(limit, offset uint64) ([]*domain.Task, uint64, error) {
+		listFunc: func(_ context.Context, limit, offset uint64) ([]*domain.Task, uint64, error) {
 			assert.Equal(t, uint64(10), limit)
 			assert.Equal(t, uint64(20), offset)
 			return []*domain.Task{}, 30, nil
@@ -273,7 +273,7 @@ func TestApi_ListTasks_ServiceError(t *testing.T) {
 	t.Parallel()
 
 	svc := &stubService{
-		listFunc: func(uint64, uint64) ([]*domain.Task, uint64, error) {
+		listFunc: func(context.Context, uint64, uint64) ([]*domain.Task, uint64, error) {
 			return nil, 0, errors.New("oops")
 		},
 	}
@@ -289,7 +289,7 @@ func TestApi_GetTask_OK(t *testing.T) {
 	t.Parallel()
 
 	svc := &stubService{
-		getFunc: func(id uint64) (*domain.Task, error) {
+		getFunc: func(_ context.Context, id uint64) (*domain.Task, error) {
 			return &domain.Task{ID: id, Name: "x", Body: "y", Status: domain.TaskStatusNew}, nil
 		},
 	}
@@ -304,14 +304,14 @@ func TestApi_GetTask_OK(t *testing.T) {
 	require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
 	assert.Equal(t, uint64(7), resp.ID)
 	assert.Equal(t, "x", resp.Name)
-	assert.Equal(t, string(domain.TaskStatusNew), resp.Status)
+	assert.Equal(t, domain.TaskStatusNew.String(), resp.Status)
 }
 
 func TestApi_GetTask_NotFound(t *testing.T) {
 	t.Parallel()
 
 	svc := &stubService{
-		getFunc: func(uint64) (*domain.Task, error) { return nil, domain.ErrTaskNotFound },
+		getFunc: func(context.Context, uint64) (*domain.Task, error) { return nil, domain.ErrTaskNotFound },
 	}
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, routeGroup+"/tasks/999", http.NoBody)
@@ -326,7 +326,7 @@ func TestApi_GetTask_BadID(t *testing.T) {
 
 	getCalled := false
 	svc := &stubService{
-		getFunc: func(uint64) (*domain.Task, error) {
+		getFunc: func(context.Context, uint64) (*domain.Task, error) {
 			getCalled = true
 			return &domain.Task{}, nil
 		},
@@ -344,11 +344,11 @@ func TestApi_UpdateTask_OK(t *testing.T) {
 	t.Parallel()
 
 	svc := &stubService{
-		updateFunc: func(id uint64, f ports.UpdateTaskParams) (*domain.Task, error) {
+		updateFunc: func(_ context.Context, id uint64, f ports.UpdateTaskParams) (*domain.Task, error) {
 			require.NotNil(t, f.Name)
 			assert.Equal(t, "renamed", *f.Name)
 			require.NotNil(t, f.Status)
-			assert.Equal(t, string(domain.TaskStatusInProcess), *f.Status)
+			assert.Equal(t, domain.TaskStatusInProcess.String(), *f.Status)
 			return &domain.Task{ID: id, Name: *f.Name, Status: domain.TaskStatus(*f.Status)}, nil
 		},
 	}
@@ -374,7 +374,7 @@ func TestApi_UpdateTask_NotFound(t *testing.T) {
 	t.Parallel()
 
 	svc := &stubService{
-		updateFunc: func(uint64, ports.UpdateTaskParams) (*domain.Task, error) {
+		updateFunc: func(context.Context, uint64, ports.UpdateTaskParams) (*domain.Task, error) {
 			return nil, domain.ErrTaskNotFound
 		},
 	}
@@ -389,7 +389,7 @@ func TestApi_UpdateTask_InvalidTransition(t *testing.T) {
 	t.Parallel()
 
 	svc := &stubService{
-		updateFunc: func(uint64, ports.UpdateTaskParams) (*domain.Task, error) {
+		updateFunc: func(context.Context, uint64, ports.UpdateTaskParams) (*domain.Task, error) {
 			return nil, domain.ErrInvalidStatusTransition
 		},
 	}
@@ -435,7 +435,7 @@ func TestApi_DeleteTask_OK(t *testing.T) {
 
 	deletedID := uint64(0)
 	svc := &stubService{
-		deleteFunc: func(id uint64) error { deletedID = id; return nil },
+		deleteFunc: func(_ context.Context, id uint64) error { deletedID = id; return nil },
 	}
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete,
 		routeGroup+"/tasks/42", http.NoBody)
@@ -450,7 +450,7 @@ func TestApi_DeleteTask_NotFound(t *testing.T) {
 	t.Parallel()
 
 	svc := &stubService{
-		deleteFunc: func(uint64) error { return domain.ErrTaskNotFound },
+		deleteFunc: func(context.Context, uint64) error { return domain.ErrTaskNotFound },
 	}
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete,
 		routeGroup+"/tasks/999", http.NoBody)

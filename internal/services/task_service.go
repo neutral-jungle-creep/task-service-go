@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -30,8 +31,8 @@ func NewTaskService(
 
 // verbose debug logging is intentional here to demonstrate the cache and the async logger in action.
 
-func (s *TaskService) Create(task *domain.Task) (uint64, error) {
-	id, err := s.repository.Store(task)
+func (s *TaskService) Create(ctx context.Context, task *domain.Task) (uint64, error) {
+	id, err := s.repository.Store(ctx, task)
 	if err != nil {
 		s.logger.AsyncError("failed to store task", err)
 		return 0, err
@@ -45,20 +46,20 @@ func (s *TaskService) Create(task *domain.Task) (uint64, error) {
 	return id, nil
 }
 
-func (s *TaskService) List(limit, offset uint64) ([]*domain.Task, uint64, error) {
+func (s *TaskService) List(ctx context.Context, limit, offset uint64) ([]*domain.Task, uint64, error) {
 	filter := &ports.ListTasksFilter{
 		Sort:   ports.SortAsc,
 		Limit:  limit,
 		Offset: offset,
 	}
 
-	total, err := s.repository.Count(filter)
+	total, err := s.repository.Count(ctx, filter)
 	if err != nil {
 		s.logger.AsyncError("failed to count tasks", err)
 		return nil, 0, err
 	}
 
-	tasks, err := s.repository.List(filter)
+	tasks, err := s.repository.List(ctx, filter)
 	if err != nil {
 		s.logger.AsyncError("failed to list tasks", err)
 		return nil, 0, err
@@ -68,14 +69,14 @@ func (s *TaskService) List(limit, offset uint64) ([]*domain.Task, uint64, error)
 	return tasks, total, nil
 }
 
-func (s *TaskService) Get(id uint64) (*domain.Task, error) {
+func (s *TaskService) Get(ctx context.Context, id uint64) (*domain.Task, error) {
 	task, ok := s.cache.Get(id)
 	if ok {
 		s.logger.AsyncDebug(fmt.Sprintf("found task %d from cache", task.ID))
 		return task, nil
 	}
 
-	task, err := s.repository.Get(id)
+	task, err := s.repository.Get(ctx, id)
 	if err != nil {
 		if errors.Is(err, domain.ErrTaskNotFound) {
 			s.logger.AsyncDebug(fmt.Sprintf("task %d not found", id))
@@ -89,8 +90,8 @@ func (s *TaskService) Get(id uint64) (*domain.Task, error) {
 	return task, nil
 }
 
-func (s *TaskService) Update(id uint64, params ports.UpdateTaskParams) (*domain.Task, error) {
-	task, err := s.repository.Get(id)
+func (s *TaskService) Update(ctx context.Context, id uint64, params ports.UpdateTaskParams) (*domain.Task, error) {
+	task, err := s.repository.Get(ctx, id)
 	if err != nil {
 		if errors.Is(err, domain.ErrTaskNotFound) {
 			return nil, err
@@ -119,7 +120,7 @@ func (s *TaskService) Update(id uint64, params ports.UpdateTaskParams) (*domain.
 	now := time.Now()
 	task.UpdatedAt = &now
 
-	err = s.repository.Update(task)
+	err = s.repository.Update(ctx, task)
 	if err != nil {
 		if errors.Is(err, domain.ErrTaskNotFound) {
 			s.cache.Delete(id)
@@ -133,8 +134,8 @@ func (s *TaskService) Update(id uint64, params ports.UpdateTaskParams) (*domain.
 	return task, nil
 }
 
-func (s *TaskService) Delete(id uint64) error {
-	err := s.repository.Delete(id)
+func (s *TaskService) Delete(ctx context.Context, id uint64) error {
+	err := s.repository.Delete(ctx, id)
 	if err != nil {
 		if errors.Is(err, domain.ErrTaskNotFound) {
 			s.cache.Delete(id)

@@ -1,14 +1,18 @@
 package ports
 
-import "task-service/internal/domain"
+import (
+	"context"
+
+	"task-service/internal/domain"
+)
 
 type TaskRepository interface {
-	Store(task *domain.Task) (uint64, error)
-	List(filter *ListTasksFilter) ([]*domain.Task, error)
-	Count(filter *ListTasksFilter) (uint64, error)
-	Get(id uint64) (*domain.Task, error)
-	Update(task *domain.Task) error
-	Delete(id uint64) error
+	Store(ctx context.Context, task *domain.Task) (uint64, error)
+	List(ctx context.Context, filter *ListTasksFilter) ([]*domain.Task, error)
+	Count(ctx context.Context, filter *ListTasksFilter) (uint64, error)
+	Get(ctx context.Context, id uint64) (*domain.Task, error)
+	Update(ctx context.Context, task *domain.Task) error
+	Delete(ctx context.Context, id uint64) error
 }
 
 const (

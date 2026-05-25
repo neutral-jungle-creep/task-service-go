@@ -37,7 +37,7 @@ func (api *API) ListTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tasks, total, err := api.taskService.List(query.Limit, query.Offset)
+	tasks, total, err := api.taskService.List(r.Context(), query.Limit, query.Offset)
 	if err != nil {
 		api.responseHandler.SendErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -91,7 +91,7 @@ func (api *API) GetTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := api.taskService.Get(id)
+	task, err := api.taskService.Get(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, domain.ErrTaskNotFound) {
 			api.responseHandler.SendErrorResponse(w, http.StatusNotFound, err)
@@ -132,7 +132,7 @@ func (api *API) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, err := api.taskService.Update(id, ports.UpdateTaskParams{
+	updated, err := api.taskService.Update(r.Context(), id, ports.UpdateTaskParams{
 		Name:   body.Name,
 		Body:   body.Body,
 		Status: body.Status,
@@ -170,7 +170,7 @@ func (api *API) DeleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = api.taskService.Delete(id)
+	err = api.taskService.Delete(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, domain.ErrTaskNotFound) {
 			api.responseHandler.SendErrorResponse(w, http.StatusNotFound, err)
@@ -215,7 +215,7 @@ func (api *API) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := api.taskService.Create(domain.NewTask(params.Name, params.Body))
+	id, err := api.taskService.Create(r.Context(), domain.NewTask(params.Name, params.Body))
 	if err != nil {
 		api.responseHandler.SendErrorResponse(w, http.StatusInternalServerError, err)
 		return

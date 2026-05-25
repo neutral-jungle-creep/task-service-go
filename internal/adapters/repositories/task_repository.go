@@ -30,8 +30,8 @@ VALUES ($1, $2, $3, $4, $5)
 RETURNING id
 `
 
-func (r *TaskRepository) Store(task *domain.Task) (uint64, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+func (r *TaskRepository) Store(ctx context.Context, task *domain.Task) (uint64, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 
 	var id uint64
@@ -40,7 +40,7 @@ func (r *TaskRepository) Store(task *domain.Task) (uint64, error) {
 		queryStoreTask,
 		task.Name,
 		task.Body,
-		string(task.Status),
+		task.Status.String(),
 		task.CreatedAt,
 		task.UpdatedAt,
 	).Scan(&id)
@@ -56,8 +56,8 @@ FROM tasks
 WHERE id = $1
 `
 
-func (r *TaskRepository) Get(id uint64) (*domain.Task, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+func (r *TaskRepository) Get(ctx context.Context, id uint64) (*domain.Task, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 
 	t := &domain.Task{}
@@ -107,8 +107,8 @@ LIMIT $2 OFFSET $3
 `
 )
 
-func (r *TaskRepository) List(filter *ports.ListTasksFilter) ([]*domain.Task, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+func (r *TaskRepository) List(ctx context.Context, filter *ports.ListTasksFilter) ([]*domain.Task, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 
 	query, args := buildListQuery(filter)
@@ -165,8 +165,8 @@ const (
 	queryCountTasksToID = `SELECT COUNT(*) FROM tasks WHERE id < $1`
 )
 
-func (r *TaskRepository) Count(filter *ports.ListTasksFilter) (uint64, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+func (r *TaskRepository) Count(ctx context.Context, filter *ports.ListTasksFilter) (uint64, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 
 	var (
@@ -190,8 +190,8 @@ SET name = $1, body = $2, status = $3, updated_at = $4
 WHERE id = $5
 `
 
-func (r *TaskRepository) Update(task *domain.Task) error {
-	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+func (r *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 
 	res, err := r.db.ExecContext(
@@ -199,7 +199,7 @@ func (r *TaskRepository) Update(task *domain.Task) error {
 		queryUpdateTask,
 		task.Name,
 		task.Body,
-		string(task.Status),
+		task.Status.String(),
 		task.UpdatedAt,
 		task.ID,
 	)
@@ -218,8 +218,8 @@ func (r *TaskRepository) Update(task *domain.Task) error {
 
 const queryDeleteTask = `DELETE FROM tasks WHERE id = $1`
 
-func (r *TaskRepository) Delete(id uint64) error {
-	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+func (r *TaskRepository) Delete(ctx context.Context, id uint64) error {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 
 	res, err := r.db.ExecContext(ctx, queryDeleteTask, id)

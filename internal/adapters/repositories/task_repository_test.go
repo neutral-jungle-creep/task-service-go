@@ -38,7 +38,7 @@ func TestTaskRepository_Store_OK(t *testing.T) {
 	}
 
 	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO tasks")).
-		WithArgs("n", "b", string(domain.TaskStatusNew), created, task.UpdatedAt).
+		WithArgs("n", "b", domain.TaskStatusNew.String(), created, task.UpdatedAt).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
 
 	id, err := repo.Store(task)
