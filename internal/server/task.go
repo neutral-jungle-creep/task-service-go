@@ -84,14 +84,7 @@ func parseListQuery(q url.Values) (dto.ListTasksQuery, error) {
 //	@Failure	500	{object}	protocol.ExceptionResponse
 //	@Router		/tasks/{id} [get]
 func (api *API) GetTask(w http.ResponseWriter, r *http.Request) {
-	params := server.RequestParams(r)
-	idParam := params["id"]
-	if len(idParam) == 0 {
-		api.responseHandler.SendErrorResponse(w, http.StatusBadRequest, errors.New("id is required"))
-		return
-	}
-
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := parsePathID(r)
 	if err != nil {
 		api.responseHandler.SendErrorResponse(w, http.StatusBadRequest, err)
 		return
