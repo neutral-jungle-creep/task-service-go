@@ -183,3 +183,55 @@ func (r *TaskRepository) Count(filter *ports.ListTasksFilter) (uint64, error) {
 	}
 	return total, nil
 }
+
+const queryUpdateTask = `
+UPDATE tasks
+SET name = $1, body = $2, status = $3, updated_at = $4
+WHERE id = $5
+`
+
+func (r *TaskRepository) Update(task *domain.Task) error {
+	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+	defer cancel()
+
+	res, err := r.db.ExecContext(
+		ctx,
+		queryUpdateTask,
+		task.Name,
+		task.Body,
+		string(task.Status),
+		task.UpdatedAt,
+		task.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("update task: %w", err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("update task rows affected: %w", err)
+	}
+	if affected == 0 {
+		return domain.ErrTaskNotFound
+	}
+	return nil
+}
+
+const queryDeleteTask = `DELETE FROM tasks WHERE id = $1`
+
+func (r *TaskRepository) Delete(id uint64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+	defer cancel()
+
+	res, err := r.db.ExecContext(ctx, queryDeleteTask, id)
+	if err != nil {
+		return fmt.Errorf("delete task: %w", err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("delete task rows affected: %w", err)
+	}
+	if affected == 0 {
+		return domain.ErrTaskNotFound
+	}
+	return nil
+}
