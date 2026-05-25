@@ -10,12 +10,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/stretchr/testify/require"
 
 	"task-service/internal/adapters/repositories"
 	"task-service/internal/server"
 	"task-service/internal/services"
+	"task-service/pkg/http/protocol"
 	"task-service/pkg/logging"
 )
 
@@ -70,7 +72,11 @@ func setupTestEnv(t *testing.T) *testEnv {
 	require.NoError(t, err)
 
 	svc := services.NewTaskService(async, repo, cache)
-	api := server.NewAPI(svc)
+	rh := protocol.NewResponseHandler(
+		async,
+		protocol.WithValidation(validator.New(validator.WithRequiredStructEnabled())),
+	)
+	api := server.NewAPI(svc, rh)
 
 	httpSrv := httptest.NewServer(api.InitRoutes("/api/v1/task-service"))
 
