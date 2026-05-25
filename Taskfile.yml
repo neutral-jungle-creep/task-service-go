@@ -33,6 +33,7 @@ tasks:
       - task: tidy
       - task: fmt
       - task: lint
+      - task: security
       - task: tests:coverage
       - task: build
 
