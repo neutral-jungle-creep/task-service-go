@@ -56,7 +56,12 @@ func TestTaskRepository_Store_DBError(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO tasks")).
 		WillReturnError(errors.New("connection refused"))
 
-	id, err := repo.Store(context.Background(), &domain.Task{Name: "x", Body: "y", Status: domain.TaskStatusNew, CreatedAt: time.Now()})
+	id, err := repo.Store(context.Background(), &domain.Task{
+		Name:      "x",
+		Body:      "y",
+		Status:    domain.TaskStatusNew,
+		CreatedAt: time.Now(),
+	})
 	require.Error(t, err)
 	assert.Zero(t, id)
 	assert.Contains(t, err.Error(), "store task")
