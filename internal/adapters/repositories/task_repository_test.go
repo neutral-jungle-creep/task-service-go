@@ -308,3 +308,95 @@ func TestTaskRepository_List_RowsErr(t *testing.T) {
 	assert.Contains(t, err.Error(), "iterate tasks")
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestTaskRepository_Update_OK(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	created := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	updated := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
+	task := &domain.Task{
+		ID:        7,
+		Name:      "n",
+		Body:      "b",
+		Status:    domain.TaskStatusInProcess,
+		CreatedAt: created,
+		UpdatedAt: &updated,
+	}
+
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE tasks")).
+		WithArgs("n", "b", "IN_PROCESS", &updated, uint64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	require.NoError(t, repo.Update(task))
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Update_NotFound(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE tasks")).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	err := repo.Update(&domain.Task{ID: 999, Status: domain.TaskStatusNew})
+	require.ErrorIs(t, err, domain.ErrTaskNotFound)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Update_DBError(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE tasks")).
+		WillReturnError(errors.New("boom"))
+
+	err := repo.Update(&domain.Task{ID: 1})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "update task")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Delete_OK(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM tasks WHERE id = $1")).
+		WithArgs(uint64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	require.NoError(t, repo.Delete(7))
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Delete_NotFound(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM tasks")).
+		WithArgs(uint64(999)).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	err := repo.Delete(999)
+	require.ErrorIs(t, err, domain.ErrTaskNotFound)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTaskRepository_Delete_DBError(t *testing.T) {
+	t.Parallel()
+
+	mock, repo := newMock(t)
+
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM tasks")).
+		WillReturnError(errors.New("nope"))
+
+	err := repo.Delete(1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "delete task")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
