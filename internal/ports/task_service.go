@@ -12,6 +12,12 @@ type TaskQueries interface {
 	Get(id uint64) (*domain.Task, error)
 }
 
+type UpdateTaskParams struct {
+	Name   *string
+	Body   *string
+	Status *string
+}
+
 type TaskCommands interface {
 	Create(task *domain.Task) (uint64, error)
 }
