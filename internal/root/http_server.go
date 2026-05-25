@@ -3,14 +3,19 @@ package root
 import (
 	"net/http"
 
+	"github.com/go-playground/validator/v10"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
 	api "task-service/internal/server"
+	"task-service/pkg/http/protocol"
 	server "task-service/pkg/http/server"
 )
 
 func (r *Root) initHTTPServer() {
-	apiImplementation := api.NewAPI(r.services.taskService)
+	validate := validator.New(validator.WithRequiredStructEnabled())
+	responseHandler := protocol.NewResponseHandler(r.logger, protocol.WithValidation(validate))
+
+	apiImplementation := api.NewAPI(responseHandler, r.services.taskService)
 
 	mux := http.NewServeMux()
 	mux.Handle("/swagger/", httpSwagger.Handler(

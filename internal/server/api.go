@@ -1,17 +1,29 @@
 package server
 
 import (
+	"io"
+	"net/http"
+
 	"task-service/internal/ports"
 	"task-service/pkg/http/server"
 )
 
-type API struct {
-	taskService ports.TaskService
+type ResponseHandler interface {
+	SendErrorResponse(w http.ResponseWriter, status int, err error)
+	SendSuccessResponse(w http.ResponseWriter, status int, body any)
+	BindJSON(body io.ReadCloser, params any) error
+	Validate(params any) error
 }
 
-func NewAPI(taskService ports.TaskService) *API {
+type API struct {
+	responseHandler ResponseHandler
+	taskService     ports.TaskService
+}
+
+func NewAPI(responseHandler ResponseHandler, taskService ports.TaskService) *API {
 	return &API{
-		taskService: taskService,
+		responseHandler: responseHandler,
+		taskService:     taskService,
 	}
 }
 
