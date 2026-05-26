@@ -99,32 +99,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 6. PATCH / DELETE для задач
-
-**Что:** добавить ручки `PATCH /tasks/{id}` и `DELETE /tasks/{id}`.
-
-**PATCH:**
-- Принимает любые из полей `name`, `body`, `status`. Поля должны быть pointer'ами или sentinel для "не менять".
-- Валидация переходов статуса (`NEW → IN_PROCESS → COMPLETE`, и т.д.).
-- Обновление `updated_at` в БД.
-- Инвалидировать запись в кэше.
-
-**DELETE:**
-- Hard delete или soft delete (`deleted_at TIMESTAMPTZ`) — решить.
-- Удалить из кэша.
-
-**Где:**
-- `internal/server/task.go` — два новых хендлера, регистрация в `Api.InitRoutes`.
-- `internal/ports/task_repository.go` — методы `Update`, `Delete`.
-- `internal/adapters/repositories/task_repository.go` — SQL `UPDATE tasks SET ... WHERE id = $1`, `DELETE FROM tasks WHERE id = $1`.
-- `internal/services/task_service.go` — `Update`, `Delete` с учётом кэша.
-- `internal/ports/task_cache.go` — метод `Delete(id uint64)`.
-- `pkg/cache/cache.go` — метод `Delete(key K)` (сейчас только Store/Get).
-- Тесты unit + integration.
-
----
-
-### 7. Лимит размера тела запроса и rate limiting
+### 6. Лимит размера тела запроса и rate limiting
 
 **Размер тела:**
 - В `internal/server/task.go` — `r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)` перед `io.ReadAll`.
