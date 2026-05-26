@@ -54,7 +54,7 @@ func TestMaxBodyBytes_ZeroDisablesMiddleware(t *testing.T) {
 	t.Parallel()
 
 	called := false
-	h := middleware.MaxBodyBytes(0)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := middleware.MaxBodyBytes(0)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
 	}))
