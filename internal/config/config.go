@@ -28,6 +28,12 @@ type HTTPServerConfig struct {
 	ReadHeaderTimeout time.Duration `envconfig:"READ_HEADER_TIMEOUT" default:"10s"`
 	ReadTimeout       time.Duration `envconfig:"READ_TIMEOUT" default:"10s"`
 	WriteTimeout      time.Duration `envconfig:"WRITE_TIMEOUT" default:"10s"`
+
+	MaxRequestBodyBytes int64 `envconfig:"MAX_REQUEST_BODY_BYTES" default:"1048576"`
+
+	IPRateLimit      float64       `envconfig:"IP_RATE_LIMIT" default:"50"`
+	IPRateBurst      int           `envconfig:"IP_RATE_BURST" default:"100"`
+	IPRateLimiterTTL time.Duration `envconfig:"IP_RATE_LIMITER_TTL" default:"10m"`
 }
 
 type DatabaseConfig struct {
