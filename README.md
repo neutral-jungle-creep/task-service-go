@@ -121,10 +121,12 @@ curl -s -X POST localhost:8888/api/v1/task-service/tasks \
 { "id": 1 }
 ```
 
-### `GET /tasks` — list all tasks (no pagination yet)
+### `GET /tasks` — paginated list
+
+Query parameters: `?limit=N&offset=M`. Defaults: `limit=50`, `offset=0`. Bounds: `1 ≤ limit ≤ 500`, `offset ≥ 0`.
 
 ```bash
-curl -s localhost:8888/api/v1/task-service/tasks
+curl -s 'localhost:8888/api/v1/task-service/tasks?limit=20&offset=0'
 ```
 
 ```json
@@ -139,7 +141,9 @@ curl -s localhost:8888/api/v1/task-service/tasks
       "updatedAt": null
     }
   ],
-  "total": 1
+  "total": 1,
+  "limit": 20,
+  "offset": 0
 }
 ```
 
@@ -147,6 +151,34 @@ curl -s localhost:8888/api/v1/task-service/tasks
 
 ```bash
 curl -s localhost:8888/api/v1/task-service/tasks/1
+```
+
+### `PATCH /tasks/{id}` — partial update
+
+Any subset of `name`, `body`, `status` may be sent. Returns the updated task.
+
+```bash
+curl -s -X PATCH localhost:8888/api/v1/task-service/tasks/1 \
+  -H 'Content-Type: application/json' \
+  -d '{"status":"IN_PROCESS"}'
+```
+
+Status transitions are enforced server-side:
+
+- `NEW → IN_PROCESS`
+- `IN_PROCESS → COMPLETE`
+- `PAUSE → IN_PROCESS` (resume)
+- any non-terminal → `PAUSE` / `CANCEL`
+- `COMPLETE` / `CANCEL` are terminal
+
+Invalid transitions return `400 Bad Request`. Unknown status values are rejected by validator before reaching the service.
+
+### `DELETE /tasks/{id}` — remove a task
+
+Hard delete. Returns `204 No Content` on success, `404 Not Found` if the id is unknown.
+
+```bash
+curl -s -X DELETE -w '%{http_code}\n' localhost:8888/api/v1/task-service/tasks/1
 ```
 
 Errors are returned as `{ "errorMessage": "...", "status": 4xx, "timestamp": "..." }`.
@@ -303,11 +335,11 @@ In containers, migrations are applied by a dedicated `task-service-migrate` serv
 ## Conventions and limitations
 
 - **Cache eviction.** Memory-driven — cleanup triggers at 90% of the configured limit and drops 1/5 of the oldest entries (sorted by key).
-- **Unpaginated list.** `GET /tasks` returns everything (cache + tail from DB). Fine for a PoC, not for production — pagination is in [ROADMAP.md](ROADMAP.md).
+- **List pagination is offset-based.** `GET /tasks?limit=N&offset=M` reads the page straight from the database (cache is bypassed for list queries to keep the page consistent). Cursor-based pagination is on the roadmap if offset becomes costly at scale.
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for the next-steps backlog (pagination, validation, metrics, tracing, auth, PATCH/DELETE, rate limits, expanded coverage, `pkg/background`).
+See [ROADMAP.md](ROADMAP.md) for the next-steps backlog (metrics, tracing, auth, rate limits, expanded coverage, `pkg/background`).
 
 ---
 
@@ -432,10 +464,12 @@ curl -s -X POST localhost:8888/api/v1/task-service/tasks \
 { "id": 1 }
 ```
 
-### `GET /tasks` — список задач (без пагинации)
+### `GET /tasks` — список задач с пагинацией
+
+Query-параметры: `?limit=N&offset=M`. По умолчанию: `limit=50`, `offset=0`. Границы: `1 ≤ limit ≤ 500`, `offset ≥ 0`.
 
 ```bash
-curl -s localhost:8888/api/v1/task-service/tasks
+curl -s 'localhost:8888/api/v1/task-service/tasks?limit=20&offset=0'
 ```
 
 ```json
@@ -450,7 +484,9 @@ curl -s localhost:8888/api/v1/task-service/tasks
       "updatedAt": null
     }
   ],
-  "total": 1
+  "total": 1,
+  "limit": 20,
+  "offset": 0
 }
 ```
 
@@ -458,6 +494,34 @@ curl -s localhost:8888/api/v1/task-service/tasks
 
 ```bash
 curl -s localhost:8888/api/v1/task-service/tasks/1
+```
+
+### `PATCH /tasks/{id}` — частичное обновление
+
+Можно передать любое подмножество полей `name`, `body`, `status`. Возвращает обновлённую задачу.
+
+```bash
+curl -s -X PATCH localhost:8888/api/v1/task-service/tasks/1 \
+  -H 'Content-Type: application/json' \
+  -d '{"status":"IN_PROCESS"}'
+```
+
+Переходы статусов проверяются на стороне сервера:
+
+- `NEW → IN_PROCESS`
+- `IN_PROCESS → COMPLETE`
+- `PAUSE → IN_PROCESS` (возобновление)
+- любой не-терминальный → `PAUSE` / `CANCEL`
+- `COMPLETE` / `CANCEL` — терминальные
+
+Недопустимый переход → `400 Bad Request`. Неизвестные значения статуса отсекаются валидатором до сервиса.
+
+### `DELETE /tasks/{id}` — удалить задачу
+
+Hard delete. Успех — `204 No Content`, неизвестный id — `404 Not Found`.
+
+```bash
+curl -s -X DELETE -w '%{http_code}\n' localhost:8888/api/v1/task-service/tasks/1
 ```
 
 Ошибки возвращаются в виде `{ "errorMessage": "...", "status": 4xx, "timestamp": "..." }`.
@@ -614,8 +678,8 @@ task db:create -- create_indexes
 ## Соглашения и ограничения
 
 - **Эвикция кеша.** Управляется памятью — cleanup стартует при достижении 90% настроенного лимита и удаляет 1/5 самых старых записей (отсортированных по ключу).
-- **Список без пагинации.** `GET /tasks` возвращает всё, что есть (cache + остаток из БД). Подходит для PoC, не для прода — пагинация в [ROADMAP.md](ROADMAP.md).
+- **Пагинация offset-based.** `GET /tasks?limit=N&offset=M` читает страницу прямо из БД (для list-запросов кеш обходится — так страница остаётся консистентной). Cursor-based пагинация — на будущее, если offset станет узким местом.
 
 ## Roadmap
 
-См. [ROADMAP.md](ROADMAP.md) — там список доработок (пагинация, валидация, метрики, трассировка, аутентификация, PATCH/DELETE, rate limits, расширение coverage, `pkg/background`).
+См. [ROADMAP.md](ROADMAP.md) — там список доработок (метрики, трассировка, аутентификация, rate limits, расширение coverage, `pkg/background`).
