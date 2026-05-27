@@ -97,6 +97,10 @@ Configuration is read via `kelseyhightower/envconfig`. Locally a `.env` file is 
 | `HTTP_SERVER_READ_HEADER_TIMEOUT` | `10s` | |
 | `HTTP_SERVER_READ_TIMEOUT` | `10s` | |
 | `HTTP_SERVER_WRITE_TIMEOUT` | `10s` | |
+| `HTTP_SERVER_MAX_REQUEST_BODY_BYTES` | `1048576` | Max JSON body size; over → 413 |
+| `HTTP_SERVER_IP_RATE_LIMIT` | `50` | Steady-state RPS per client IP; `0` disables limiting |
+| `HTTP_SERVER_IP_RATE_BURST` | `100` | Burst capacity above the steady rate |
+| `HTTP_SERVER_IP_RATE_LIMITER_TTL` | `10m` | How long an idle per-IP limiter is kept in memory |
 | `DB_POSTGRES_DSN` | **required** | Postgres connection string (`host=… port=… user=… password=… dbname=… sslmode=…`) |
 | `DB_POSTGRES_MAX_OPEN_CONNS` | `10` | |
 | `DB_POSTGRES_MAX_IDLE_CONNS` | `5` | |
@@ -339,7 +343,7 @@ In containers, migrations are applied by a dedicated `task-service-migrate` serv
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for the next-steps backlog (metrics, tracing, auth, rate limits, expanded coverage, `pkg/background`).
+See [ROADMAP.md](ROADMAP.md) for the next-steps backlog (metrics, tracing, auth, expanded coverage, `pkg/background`).
 
 ---
 
@@ -440,6 +444,10 @@ REST-сервис для управления задачами (CRUD): созд�
 | `HTTP_SERVER_READ_HEADER_TIMEOUT` | `10s` | |
 | `HTTP_SERVER_READ_TIMEOUT` | `10s` | |
 | `HTTP_SERVER_WRITE_TIMEOUT` | `10s` | |
+| `HTTP_SERVER_MAX_REQUEST_BODY_BYTES` | `1048576` | Максимальный размер JSON-тела; сверху → 413 |
+| `HTTP_SERVER_IP_RATE_LIMIT` | `50` | Установившийся RPS на IP клиента; `0` отключает лимитирование |
+| `HTTP_SERVER_IP_RATE_BURST` | `100` | Размер бакета — мгновенный всплеск сверх steady rate |
+| `HTTP_SERVER_IP_RATE_LIMITER_TTL` | `10m` | Сколько неактивный per-IP лимитер живёт в памяти |
 | `DB_POSTGRES_DSN` | **обязателен** | Строка подключения к Postgres (`host=… port=… user=… password=… dbname=… sslmode=…`) |
 | `DB_POSTGRES_MAX_OPEN_CONNS` | `10` | |
 | `DB_POSTGRES_MAX_IDLE_CONNS` | `5` | |
@@ -682,4 +690,4 @@ task db:create -- create_indexes
 
 ## Roadmap
 
-См. [ROADMAP.md](ROADMAP.md) — там список доработок (метрики, трассировка, аутентификация, rate limits, расширение coverage, `pkg/background`).
+См. [ROADMAP.md](ROADMAP.md) — там список доработок (метрики, трассировка, аутентификация, расширение coverage, `pkg/background`).

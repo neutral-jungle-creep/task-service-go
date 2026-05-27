@@ -99,22 +99,6 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 6. Лимит размера тела запроса и rate limiting
-
-**Размер тела:**
-- В `internal/server/task.go` — `r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)` перед `io.ReadAll`.
-- Конфиг: `HTTP_MAX_REQUEST_BODY_BYTES` (default 1MB).
-
-**Rate limiting:**
-- IP-based через `golang.org/x/time/rate.Limiter`, словарь по IP, периодическая чистка.
-- Либо `github.com/didip/tollbooth/v7` — готовое решение.
-- Конфиг: `HTTP_IP_RATE_LIMIT` (req/s), `HTTP_IP_RATE_BURST`.
-- Middleware в `pkg/http/server/` или новом `pkg/http/middleware/`.
-
-**Тесты:** проверить что 1024 запроса в секунду с лимитом 10 RPS → большинство получает 429.
-
----
-
 ## Уже выполнено (контекст)
 
 - Sentinel `domain.ErrTaskNotFound` для not-found семантики Task (можно расширить аналогичной обработкой на другие ресурсы, когда они появятся).
