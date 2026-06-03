@@ -116,9 +116,8 @@ func TestRegistrar_Stop_JoinsErrors(t *testing.T) {
 	r.RegisterStopHandler(func() error { return errB })
 
 	err := r.Stop()
-	require.Error(t, err)
-	assert.ErrorIs(t, err, errA)
-	assert.ErrorIs(t, err, errB)
+	require.ErrorIs(t, err, errA)
+	require.ErrorIs(t, err, errB)
 }
 
 func TestRegistrar_ConcurrentRegistrationIsSafe(t *testing.T) {

@@ -29,7 +29,7 @@ REST service for task management (CRUD): create, get by id, list. PostgreSQL is 
 
 | Layer | Technology |
 |---|---|
-| Language | Go 1.26.3 |
+| Language | Go 1.26.4 |
 | HTTP | stdlib `net/http` + custom router [pkg/http/server](pkg/http/server) with `{param}` support |
 | Logging | custom sync + async logger [pkg/logging](pkg/logging) |
 | Cache | generic in-memory cache [pkg/cache](pkg/cache) with memory-based eviction |
@@ -257,7 +257,7 @@ task build:docker
 
 [build/server/Dockerfile](build/server/Dockerfile) is multi-stage:
 
-- `builder` — `golang:1.26.3-alpine`, `go build`
+- `builder` — `golang:1.26.4-alpine`, `go build`
 - `goose-builder` — installs goose in its own layer
 - `app` — `alpine:3.20` with the built binary, runs as user `app`
 - `migrate` — `alpine:3.20` with goose and `/migrations`
@@ -376,7 +376,7 @@ REST-сервис для управления задачами (CRUD): созд�
 
 | Слой | Технология |
 |---|---|
-| Язык | Go 1.26.3 |
+| Язык | Go 1.26.4 |
 | HTTP | stdlib `net/http` + собственный роутер [pkg/http/server](pkg/http/server) с поддержкой `{param}` |
 | Логирование | собственный синхронный + асинхронный логгер [pkg/logging](pkg/logging) |
 | Кеш | generic in-memory кеш [pkg/cache](pkg/cache) с эвикцией по памяти |
@@ -604,7 +604,7 @@ task build:docker
 
 [build/server/Dockerfile](build/server/Dockerfile) — multi-stage:
 
-- `builder` — `golang:1.26.3-alpine`, `go build`
+- `builder` — `golang:1.26.4-alpine`, `go build`
 - `goose-builder` — устанавливает goose в отдельном слое
 - `app` — `alpine:3.20` с собранным бинарником, запускается под пользователем `app`
 - `migrate` — `alpine:3.20` с goose и каталогом `/migrations`
