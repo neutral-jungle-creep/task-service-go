@@ -6,47 +6,7 @@
 
 ## Инфраструктура и качество
 
-### 1. `BackgroundRegistrar` в `pkg/background`
-
-**Что:** вынести логику `startBackgroundJobs` + `stop` из `internal/root/root.go` в переиспользуемый пакет `pkg/background`.
-
-**Текущее состояние:** в [internal/root/root.go](internal/root/root.go) живут:
-- `backgroundJobs []func() error`
-- `stopHandlers []func()`
-- `RegisterBackgroundJob`, `RegisterStopHandler`
-- `startBackgroundJobs() chan error`
-- `stop()` (параллельная остановка через `sync.WaitGroup`)
-
-Это шаблон не специфичный для task-service — пригодится в любом сервисе с фоновыми задачами.
-
-**Целевой API (примерно):**
-
-```go
-// pkg/background/registrar.go
-package background
-
-type Job func() error
-type StopHandler func()
-
-type Registrar struct { ... }
-
-func New() *Registrar
-func (r *Registrar) RegisterJob(j Job)
-func (r *Registrar) RegisterStopHandler(h StopHandler)
-func (r *Registrar) Run(ctx context.Context) error  // запускает все jobs, ждёт ctx.Done или первую ошибку
-func (r *Registrar) Stop()                          // параллельный shutdown handler-ов
-```
-
-**Что меняется в проекте:**
-- `internal/root/root.go` — содержит `*background.Registrar` вместо локальных полей; делегирует `RegisterBackgroundJob`/`RegisterStopHandler`/`Run`/`stop`.
-- `internal/root/{http_server,observability,service,repository}.go` — без изменений, всё ещё вызывают `r.RegisterBackgroundJob` / `r.RegisterStopHandler`.
-- Заодно фиксится мини-баг: при панике одного job-а сейчас `wg.Add(len(stopHandlers))` корректно, но `stop` запускает горутины не в `defer` — стоит пересобрать на `errgroup` или ручной `sync.WaitGroup` внутри `pkg/background`.
-
-**Тесты:** unit-тесты в `pkg/background` на сценарии — все jobs зелёные → Run ждёт ctx; один job падает → Run возвращает ошибку и тушит handler-ы; ctx отменён → Run возвращается без ошибок; параллельность остановки.
-
----
-
-### 2. `testcontainers-go` для repository unit-тестов
+### 1. `testcontainers-go` для repository unit-тестов
 
 **Что:** альтернатива sqlmock — поднять реальный Postgres внутри теста через `testcontainers-go` (без зависимости от внешнего docker-compose), чтобы получить реальные query-execution планы вместо сравнения строк SQL.
 
@@ -58,7 +18,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ## Roadmap фич
 
-### 3. Метрики Prometheus (`/metrics`)
+### 2. Метрики Prometheus (`/metrics`)
 
 **Что:** инструментация HTTP и БД, выкладывание `/metrics` эндпоинта.
 
@@ -71,7 +31,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 4. Distributed tracing (OpenTelemetry)
+### 3. Distributed tracing (OpenTelemetry)
 
 **Что:** трассировка запросов через OTEL SDK с экспортом в Jaeger/Tempo.
 
@@ -85,7 +45,7 @@ func (r *Registrar) Stop()                          // параллельный 
 
 ---
 
-### 5. Аутентификация (JWT / API token)
+### 4. Аутентификация (JWT / API token)
 
 **Что:** middleware проверки токена; неавторизованные запросы → 401.
 

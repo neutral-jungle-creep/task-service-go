@@ -16,7 +16,7 @@ func (r *Root) initRepositories() error {
 		return err
 	}
 
-	r.RegisterStopHandler(func() { _ = db.Close() })
+	r.RegisterStopHandler(func() error { return db.Close() })
 
 	r.repositories.taskRepository = repositories.NewTaskRepository(db)
 	return nil

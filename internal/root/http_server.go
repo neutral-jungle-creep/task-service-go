@@ -41,7 +41,7 @@ func (r *Root) initHTTPServer() {
 		server.ReadTimeout(r.config.HTTPServer.ReadTimeout),
 	)
 
-	r.RegisterStopHandler(func() { _ = s.Shutdown(r.ctx) })
+	r.RegisterStopHandler(func() error { return s.Shutdown(r.ctx) })
 
 	r.RegisterBackgroundJob(func() error {
 		r.logger.Info("starting HTTP server on addr " + r.config.HTTPServer.ListenPort)

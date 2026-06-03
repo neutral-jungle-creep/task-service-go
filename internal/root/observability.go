@@ -13,7 +13,8 @@ func (r *Root) initObservability(logger *logging.Logger) {
 	r.RegisterBackgroundJob(func() error {
 		return r.logger.Process()
 	})
-	r.RegisterStopHandler(func() {
+	r.RegisterStopHandler(func() error {
 		r.logger.Stop()
+		return nil
 	})
 }

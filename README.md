@@ -343,7 +343,7 @@ In containers, migrations are applied by a dedicated `task-service-migrate` serv
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for the next-steps backlog (metrics, tracing, auth, expanded coverage, `pkg/background`).
+See [ROADMAP.md](ROADMAP.md) for the next-steps backlog (metrics, tracing, auth, expanded coverage).
 
 ---
 
@@ -690,4 +690,4 @@ task db:create -- create_indexes
 
 ## Roadmap
 
-См. [ROADMAP.md](ROADMAP.md) — там список доработок (метрики, трассировка, аутентификация, расширение coverage, `pkg/background`).
+См. [ROADMAP.md](ROADMAP.md) — там список доработок (метрики, трассировка, аутентификация, расширение coverage).
