@@ -81,14 +81,15 @@ func TestRegistrar_Stop_RunsAllHandlersInParallel(t *testing.T) {
 
 	const n = 5
 	for i := 0; i < n; i++ {
-		r.RegisterStopHandler(func() {
+		r.RegisterStopHandler(func() error {
 			time.Sleep(50 * time.Millisecond)
 			atomic.AddInt32(&ran, 1)
+			return nil
 		})
 	}
 
 	start := time.Now()
-	r.Stop()
+	require.NoError(t, r.Stop())
 	elapsed := time.Since(start)
 
 	assert.Equal(t, int32(n), atomic.LoadInt32(&ran), "all handlers must run")
@@ -101,7 +102,22 @@ func TestRegistrar_Stop_NoHandlersIsNoOp(t *testing.T) {
 	t.Parallel()
 
 	r := background.New()
-	assert.NotPanics(t, func() { r.Stop() })
+	assert.NotPanics(t, func() { _ = r.Stop() })
+}
+
+func TestRegistrar_Stop_JoinsErrors(t *testing.T) {
+	t.Parallel()
+
+	r := background.New()
+	errA := errors.New("close A failed")
+	errB := errors.New("close B failed")
+	r.RegisterStopHandler(func() error { return errA })
+	r.RegisterStopHandler(func() error { return nil })
+	r.RegisterStopHandler(func() error { return errB })
+
+	err := r.Stop()
+	require.ErrorIs(t, err, errA)
+	require.ErrorIs(t, err, errB)
 }
 
 func TestRegistrar_ConcurrentRegistrationIsSafe(t *testing.T) {
@@ -115,11 +131,11 @@ func TestRegistrar_ConcurrentRegistrationIsSafe(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			r.RegisterJob(func() error { return nil })
-			r.RegisterStopHandler(func() {})
+			r.RegisterStopHandler(func() error { return nil })
 		}()
 	}
 	wg.Wait()
 
 	// Tear-down should not blow up.
-	r.Stop()
+	_ = r.Stop()
 }

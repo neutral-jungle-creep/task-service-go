@@ -47,7 +47,11 @@ func New(ctx context.Context, config *config.Config, logger *logging.Logger) (*R
 }
 
 func (r *Root) Run() error {
-	defer r.background.Stop()
+	defer func() {
+		if stopErr := r.background.Stop(); stopErr != nil {
+			r.logger.Error("stop handlers reported errors", stopErr)
+		}
+	}()
 
 	err := r.background.Run(r.ctx)
 	if err == nil {
@@ -64,6 +68,6 @@ func (r *Root) RegisterBackgroundJob(job func() error) {
 	r.background.RegisterJob(job)
 }
 
-func (r *Root) RegisterStopHandler(h func()) {
+func (r *Root) RegisterStopHandler(h func() error) {
 	r.background.RegisterStopHandler(h)
 }
